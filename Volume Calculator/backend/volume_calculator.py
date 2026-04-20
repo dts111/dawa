@@ -1,13 +1,13 @@
 """
 Volume Calculator
 Computes cut/fill volumes between two TIN surfaces using grid-based interpolation.
+Uses matplotlib.tri (no scipy dependency) for interpolation.
 """
 
 from dataclasses import dataclass
 from typing import Tuple
 import numpy as np
-from scipy.interpolate import LinearNDInterpolator
-from scipy.spatial import Delaunay
+import matplotlib.tri as mtri
 
 from landxml_parser import TINSurface
 
@@ -52,11 +52,30 @@ def _auto_resolution(surface: TINSurface, max_cells: int = 400) -> float:
     return max(res, 0.1)
 
 
-def _build_interpolator(surface: TINSurface) -> LinearNDInterpolator:
-    """Build a 2-D scipy interpolator for the surface."""
-    xy = surface.points[:, :2]
-    z = surface.points[:, 2]
-    return LinearNDInterpolator(xy, z)
+def _build_interpolator(surface: TINSurface):
+    """
+    Build a matplotlib.tri linear interpolator for the surface.
+    Returns a callable f(x_array, y_array) -> z_array (NaN outside hull).
+    """
+    x = surface.points[:, 0].astype(float)
+    y = surface.points[:, 1].astype(float)
+    z = surface.points[:, 2].astype(float)
+
+    # Remove duplicate points (can cause triangulation to fail)
+    _, unique_idx = np.unique(np.column_stack([x, y]), axis=0, return_index=True)
+    x, y, z = x[unique_idx], y[unique_idx], z[unique_idx]
+
+    triang = mtri.Triangulation(x, y)
+    interp = mtri.LinearTriInterpolator(triang, z)
+
+    def query(qx, qy):
+        result = interp(qx, qy)
+        # Convert masked array → plain numpy array with NaN for masked values
+        if hasattr(result, 'filled'):
+            return result.filled(np.nan)
+        return np.asarray(result, dtype=float)
+
+    return query
 
 
 def calculate_volumes(
@@ -107,14 +126,15 @@ def calculate_volumes(
         grid_y = np.linspace(y_min, y_max, MAX_CELLS)
 
     GX, GY = np.meshgrid(grid_x, grid_y)  # shape (rows, cols)
-    pts_flat = np.column_stack([GX.ravel(), GY.ravel()])
+    qx = GX.ravel().astype(float)
+    qy = GY.ravel().astype(float)
 
     # ---- Interpolate surfaces ----
     interp1 = _build_interpolator(surface1)
     interp2 = _build_interpolator(surface2)
 
-    z1_flat = interp1(pts_flat)
-    z2_flat = interp2(pts_flat)
+    z1_flat = interp1(qx, qy)
+    z2_flat = interp2(qx, qy)
 
     z1 = z1_flat.reshape(GX.shape)
     z2 = z2_flat.reshape(GX.shape)
@@ -183,27 +203,18 @@ def compute_section(
     """
     Sample elevation profiles for every surface along a section line
     from (x1,y1) to (x2,y2).
-
-    Returns
-    -------
-    {
-        "distance": [0.0, …, total_length],   # m along the line
-        "profiles": { surface_name: [z | null, …] },
-        "line": { "x1","y1","x2","y2" }
-    }
     """
     num_samples = max(50, min(int(num_samples), 1000))
     t = np.linspace(0.0, 1.0, num_samples)
-    xs = x1 + t * (x2 - x1)
-    ys = y1 + t * (y2 - y1)
+    xs = (x1 + t * (x2 - x1)).astype(float)
+    ys = (y1 + t * (y2 - y1)).astype(float)
     total_len = float(np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2))
     distances = (t * total_len).tolist()
-    pts = np.column_stack([xs, ys])
 
     profiles: dict = {}
     for surf in surfaces:
         interp = _build_interpolator(surf)
-        z_raw = interp(pts)
+        z_raw = interp(xs, ys)
         profiles[surf.name] = [
             (float(v) if not np.isnan(v) else None) for v in z_raw
         ]
