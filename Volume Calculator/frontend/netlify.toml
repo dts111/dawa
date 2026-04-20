@@ -1,14 +1,9 @@
 [build]
-  base    = "frontend"
   command = "npm run build"
   publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20"
-
-# Proxy /api/* to the Python backend on Render
-# Set VITE_API_URL in Netlify Environment Variables to your Render service URL
-# e.g.  VITE_API_URL = https://landxml-volume-api.onrender.com
 
 [[redirects]]
   from   = "/*"
