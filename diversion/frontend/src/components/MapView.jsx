@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Map, { Marker, Source, Layer, NavigationControl } from 'react-map-gl/maplibre'
 import { M25_JUNCTIONS } from '../junctions'
-import M25_TRACK from '../m25_track.json'
 
 const ROADS_STYLE = 'https://tiles.openfreemap.org/styles/liberty'
 
@@ -127,6 +126,14 @@ export default function MapView({
 }) {
   const mapRef = useRef()
   const [satellite, setSatellite] = useState(false)
+  const [m25Track, setM25Track] = useState(null)
+
+  useEffect(() => {
+    fetch('/m25_track.json')
+      .then((r) => r.json())
+      .then(setM25Track)
+      .catch(console.error)
+  }, [])
 
   // Right-click drag to pan
   useEffect(() => {
@@ -189,20 +196,29 @@ export default function MapView({
         <NavigationControl position="top-right" showCompass={false} />
 
         {/* ── M25 road track (always visible) ────────────────────── */}
-        <Source id="m25-track" type="geojson" data={M25_TRACK}>
-          <Layer
-            id="m25-track-casing"
-            type="line"
-            layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-            paint={{ 'line-color': '#1e3a5f', 'line-width': 8, 'line-opacity': 0.9 }}
-          />
-          <Layer
-            id="m25-track-line"
-            type="line"
-            layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-            paint={{ 'line-color': '#60a5fa', 'line-width': 4, 'line-opacity': 1 }}
-          />
-        </Source>
+        {m25Track && (
+          <Source id="m25-track" type="geojson" data={m25Track}>
+            <Layer
+              id="m25-track-casing"
+              type="line"
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+              paint={{ 'line-color': '#1e3a5f', 'line-width': 8, 'line-opacity': 0.9 }}
+            />
+            <Layer
+              id="m25-track-line"
+              type="line"
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+              paint={{ 'line-color': '#60a5fa', 'line-width': 4, 'line-opacity': 1 }}
+            />
+            <Layer
+              id="m25-junction-links"
+              type="line"
+              filter={['==', ['get', 'name'], 'M25 Junction Link']}
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+              paint={{ 'line-color': '#60a5fa', 'line-width': 5, 'line-opacity': 1 }}
+            />
+          </Source>
+        )}
 
         {/* ── M25 background junction labels (always visible) ────── */}
         {M25_JUNCTIONS.map((jct) => (

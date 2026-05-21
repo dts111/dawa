@@ -79,24 +79,18 @@ JUNCTION_BY_ID = {j["id"]: j for j in JUNCTIONS}
 def make_junction_query(out_geom: bool) -> str:
     """
     Build an Overpass union query that fetches, within 500 m of every M25
-    junction:
-      1. The specific connecting motorway / A-road (by ref) for that junction
-      2. Any roundabout circulatory roads (junction=roundabout)
+    junction, ALL motorway / trunk / primary connecting roads (excluding M25
+    itself) plus any roundabout circulatories. No manual road list needed.
     """
     radius = 500
+    highway_filter = '["highway"~"motorway|motorway_link|trunk|trunk_link|primary|primary_link"]["ref"!="M25"]'
     rb_filter = '["junction"="roundabout"]'
     out_clause = "out geom;" if out_geom else "out;"
 
     parts = []
-    for jid, refs in JUNCTION_CONNECTIONS.items():
-        jct = JUNCTION_BY_ID.get(jid)
-        if not jct:
-            continue
+    for jct in JUNCTIONS:
         around = f"(around:{radius},{jct['lat']},{jct['lon']})"
-        # One clause per connecting road ref
-        for ref in refs:
-            parts.append(f'  way["ref"="{ref}"]{around};')
-        # Roundabouts at this junction
+        parts.append(f'  way{highway_filter}{around};')
         parts.append(f'  way{rb_filter}{around};')
 
     return "[out:json][timeout:180];\n(\n" + "\n".join(parts) + f"\n);\n{out_clause}"
@@ -106,9 +100,10 @@ def fetch(query: str, retries: int = 3) -> dict:
     for attempt in range(retries):
         try:
             resp = httpx.post(OVERPASS_URL, data={"data": query}, headers=HEADERS, timeout=180)
-            if resp.status_code == 429:
+            if resp.status_code in (429, 504):
                 wait = 30 * (attempt + 1)
-                print(f"    Rate limited — waiting {wait}s before retry {attempt + 1}/{retries}...")
+                label = "Rate limited" if resp.status_code == 429 else "Gateway timeout"
+                print(f"    {label} — waiting {wait}s before retry {attempt + 1}/{retries}...")
                 time.sleep(wait)
                 continue
             resp.raise_for_status()
