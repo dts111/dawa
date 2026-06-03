@@ -1,0 +1,2183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DAFEGEN — Bespoke Energy Software for Nepal & Emerging Markets</title>
+  <meta name="description" content="DAFEGEN is a UK-registered bespoke software development company delivering tailored solutions for Nepal's energy sector — engineered to UK standards, scaled for the world." />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@300;400;500;600;700;800&display=swap');
+
+    /* ─── CSS VARIABLES ─────────────────────────────────────────── */
+    :root {
+      --bg:          hsl(144, 14%, 96%);
+      --bg-alt:      hsl(150, 8%, 90%);
+      --bg-card:     hsl(144, 14%, 96%);
+      --bg-trust:    hsl(150, 8%, 90%);
+      --navy:        hsl(210, 8%, 11%);
+      --blue:        hsl(43, 67%, 52%);
+      --blue-light:  hsl(43, 67%, 64%);
+      --purple:      hsl(43, 67%, 52%);
+      --purple-light:hsl(43, 67%, 64%);
+      --teal:        hsl(190, 43%, 28%);
+      --orange:      hsl(30, 60%, 50%);
+      --white:       #FFFFFF;
+      --grey:        hsl(210, 8%, 28%);
+      --grey-dim:    hsl(210, 5%, 40%);
+      --font-head:   'Instrument Serif', serif;
+      --font-body:   'Manrope', sans-serif;
+      --font-mono:   'JetBrains Mono', monospace;
+      --radius:      0.5rem;
+      --transition:  0.25s ease;
+    }
+
+    /* ─── RESET & BASE ──────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      scroll-behavior: smooth;
+      scrollbar-width: thin;
+      scrollbar-color: var(--blue) hsl(150, 8%, 85%);
+    }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: hsl(150, 8%, 85%); }
+    ::-webkit-scrollbar-thumb { background: var(--blue); border-radius: 4px; }
+
+    body {
+      background: var(--bg);
+      color: var(--navy);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    img { max-width: 100%; display: block; }
+    a { text-decoration: none; color: inherit; }
+    button { font-family: var(--font-body); cursor: pointer; border: none; background: none; }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    /* ─── UTILITY ───────────────────────────────────────────────── */
+    .section-label {
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 12px;
+    }
+
+    .section-headline {
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: clamp(1.9rem, 4vw, 2.8rem);
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      color: var(--navy);
+      margin-bottom: 20px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      border-radius: 6px;
+      font-family: var(--font-body);
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: all var(--transition);
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--blue);
+      color: var(--navy);
+      border: 2px solid var(--blue);
+      font-weight: 600;
+    }
+    .btn-primary:hover {
+      background: var(--blue-light);
+      border-color: var(--blue-light);
+      transform: scale(1.02);
+    }
+    .btn-outline-white {
+      background: transparent;
+      color: var(--white);
+      border: 2px solid rgba(255,255,255,0.65);
+    }
+    .btn-outline-white:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: var(--white);
+      transform: scale(1.02);
+    }
+    .btn-outline-purple {
+      background: transparent;
+      color: var(--navy);
+      border: 2px solid var(--blue);
+    }
+    .btn-outline-purple:hover {
+      background: hsla(43, 67%, 52%, 0.1);
+      border-color: var(--blue-light);
+      color: var(--navy);
+      transform: scale(1.02);
+    }
+
+    /* Scroll reveal */
+    .reveal {
+      opacity: 0;
+      transform: translateY(32px);
+      transition: opacity 0.65s ease, transform 0.65s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: none;
+    }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+    .reveal-delay-4 { transition-delay: 0.4s; }
+    .reveal-delay-5 { transition-delay: 0.5s; }
+
+    /* ─── NAVIGATION ────────────────────────────────────────────── */
+    #navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      padding: 0 32px;
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: hsl(144, 14%, 96%);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      transition: box-shadow var(--transition);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .nav-logo-img {
+      height: 48px;
+      width: auto;
+      display: block;
+      mix-blend-mode: multiply;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 36px;
+      list-style: none;
+    }
+    .nav-links a {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--grey);
+      letter-spacing: 0.01em;
+      position: relative;
+      transition: color var(--transition);
+    }
+    .nav-links a::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: var(--blue);
+      transition: width var(--transition);
+    }
+    .nav-links a:hover,
+    .nav-links a.active {
+      color: var(--blue);
+    }
+    .nav-links a:hover::after,
+    .nav-links a.active::after {
+      width: 100%;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    /* Hamburger */
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      padding: 6px;
+      cursor: pointer;
+      z-index: 1001;
+    }
+    .hamburger span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      background: var(--navy);
+      border-radius: 2px;
+      transition: all var(--transition);
+    }
+    .hamburger.open span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+    .hamburger.open span:nth-child(2) { opacity: 0; }
+    .hamburger.open span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+    /* Mobile nav overlay */
+    .mobile-nav {
+      display: none;
+      position: fixed;
+      inset: 0;
+      top: 70px;
+      background: hsla(144, 14%, 96%, 0.98);
+      backdrop-filter: blur(20px);
+      z-index: 999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+    }
+    .mobile-nav.open { display: flex; }
+    .mobile-nav a {
+      font-family: var(--font-head);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--navy);
+      letter-spacing: 0.02em;
+      transition: color var(--transition);
+    }
+    .mobile-nav a:hover { color: var(--blue); }
+    .mobile-nav-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    /* ─── HERO ──────────────────────────────────────────────────── */
+    #hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      padding-top: 70px;
+      background:
+        linear-gradient(135deg, rgba(8,12,14,0.85) 0%, rgba(15,22,26,0.72) 50%, rgba(8,12,14,0.90) 100%),
+        url('https://images.unsplash.com/photo-1454496522488-7a8e488e8606?auto=format&fit=crop&w=1920&q=85') center/cover no-repeat;
+    }
+
+    /* Subtle grid pattern */
+    #hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(hsla(43,67%,52%,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, hsla(43,67%,52%,0.06) 1px, transparent 1px);
+      background-size: 64px 64px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      max-width: 820px;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: hsla(43, 67%, 52%, 0.15);
+      border: 1px solid hsla(43, 67%, 52%, 0.35);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: hsl(43, 80%, 72%);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+    .hero-eyebrow .dot {
+      width: 6px;
+      height: 6px;
+      background: #15803d;
+      border-radius: 50%;
+      animation: pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    .hero-title {
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: clamp(3rem, 7vw, 5.5rem);
+      line-height: 1.0;
+      letter-spacing: 0.01em;
+      color: var(--white);
+      margin-bottom: 28px;
+      text-transform: uppercase;
+    }
+    .hero-title .accent { color: hsl(43, 80%, 72%); }
+
+    .hero-sub {
+      font-size: clamp(1rem, 1.8vw, 1.15rem);
+      color: rgba(255,255,255,0.7);
+      max-width: 620px;
+      margin-bottom: 44px;
+      line-height: 1.75;
+    }
+
+    .hero-ctas {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    /* Decorative bird silhouette */
+    .hero-bird-bg {
+      position: absolute;
+      right: -40px;
+      bottom: -20px;
+      font-size: 28vw;
+      opacity: 0.03;
+      pointer-events: none;
+      z-index: 1;
+      line-height: 1;
+      filter: blur(2px);
+      user-select: none;
+    }
+
+    /* ─── TRUST BAR ─────────────────────────────────────────────── */
+    #trust {
+      background: var(--bg-trust);
+      border-top: 1px solid hsl(150, 8%, 85%);
+      border-bottom: 1px solid hsl(150, 8%, 85%);
+      padding: 36px 0;
+    }
+
+    .trust-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+    }
+
+    .trust-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 16px 24px;
+      text-align: center;
+      border-right: 1px solid hsl(150, 8%, 85%);
+    }
+    .trust-item:last-child { border-right: none; }
+
+    .trust-icon {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      border-radius: 8px;
+      background: hsla(43,67%,52%,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .trust-icon svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--blue);
+      stroke-width: 1.9;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .trust-text {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+    }
+    .trust-text strong {
+      font-family: var(--font-head);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--navy);
+    }
+    .trust-text span {
+      font-size: 0.75rem;
+      color: var(--grey-dim);
+    }
+
+    /* ─── ABOUT ─────────────────────────────────────────────────── */
+    #about {
+      padding: 100px 0;
+      background: var(--bg);
+    }
+
+    .about-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+    }
+
+    .about-body {
+      font-size: 1.05rem;
+      color: var(--grey);
+      line-height: 1.85;
+      margin-bottom: 32px;
+    }
+    .about-body p + p { margin-top: 20px; }
+
+    .text-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--blue);
+      font-weight: 500;
+      font-size: 0.95rem;
+      transition: gap var(--transition), color var(--transition);
+    }
+    .text-link:hover { gap: 10px; color: var(--navy); }
+
+    /* About graphic card */
+    .about-card {
+      background: var(--bg-card);
+      border: 1px solid hsl(150, 8%, 85%);
+      border-radius: var(--radius);
+      padding: 40px 32px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
+    .about-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--teal), var(--blue), var(--orange));
+    }
+
+    .about-bridge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .about-flag {
+      text-align: center;
+    }
+    .about-flag .flag { font-size: 2.8rem; }
+    .about-flag span {
+      display: block;
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--grey-dim);
+      margin-top: 6px;
+    }
+
+    .about-arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: var(--blue);
+    }
+    .about-arrow .lightning {
+      font-size: 1.8rem;
+      animation: pulse-lightning 2s ease-in-out infinite;
+    }
+    @keyframes pulse-lightning {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+    .about-arrow .line {
+      width: 60px;
+      height: 1px;
+      background: linear-gradient(90deg, var(--blue), var(--blue-light));
+    }
+
+    .about-tagline {
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--grey-dim);
+      margin-top: 16px;
+    }
+    .about-tagline strong {
+      color: var(--blue);
+    }
+
+    /* ─── SERVICES ──────────────────────────────────────────────── */
+    #services { /* rows handle own spacing */ }
+
+    .services-hero-panel {
+      padding: 80px 0 72px;
+      background: var(--navy);
+      position: relative;
+      overflow: hidden;
+    }
+    .services-hero-panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(hsla(43,67%,52%,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, hsla(43,67%,52%,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+    .services-hero-panel .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.3em;
+      color: var(--blue);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .services-hero-panel .section-label::before {
+      content: '';
+      display: block;
+      width: 48px;
+      height: 1px;
+      background: var(--blue);
+      flex-shrink: 0;
+    }
+    .services-hero-panel .section-headline {
+      color: var(--white);
+      max-width: 640px;
+      font-size: clamp(2.8rem, 5.5vw, 4.5rem);
+      line-height: 0.95;
+      letter-spacing: -0.02em;
+      margin-bottom: 20px;
+    }
+    .services-hero-panel .section-headline .accent { color: hsl(43, 80%, 72%); }
+    .services-hero-tagline {
+      font-family: var(--font-body);
+      font-size: 1.1rem;
+      color: rgba(255,255,255,0.4);
+      max-width: 520px;
+      line-height: 1.7;
+      margin-bottom: 44px;
+    }
+    .platform-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .platform-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 10px 18px;
+    }
+    .platform-badge-icon { font-size: 1.1rem; }
+    .platform-badge-title {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--white);
+      line-height: 1.2;
+    }
+    .platform-badge-sub {
+      font-family: var(--font-mono);
+      font-size: 0.625rem;
+      color: rgba(255,255,255,0.3);
+      letter-spacing: 0.04em;
+    }
+
+    .service-row {
+      padding: 88px 0;
+      position: relative;
+    }
+    .service-row::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, hsl(150, 8%, 82%), transparent);
+    }
+    .service-row:nth-child(odd)  { background: var(--bg); }
+    .service-row:nth-child(even) { background: var(--bg-alt); }
+
+    .service-row-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 72px;
+      align-items: center;
+    }
+    .service-row-inner.reversed .service-row-text     { order: 2; }
+    .service-row-inner.reversed .service-row-img-wrap { order: 1; }
+
+    .service-row-icon-wrap {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      background: hsla(190, 43%, 28%, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    .service-row-icon-wrap svg {
+      width: 28px;
+      height: 28px;
+      stroke: var(--teal);
+      stroke-width: 1.75;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .platform-badge-icon svg {
+      width: 16px;
+      height: 16px;
+      stroke: rgba(255,255,255,0.7);
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      display: block;
+    }
+    .service-row-tagline {
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      font-weight: 400;
+      color: var(--blue);
+      margin-bottom: 12px;
+      letter-spacing: 0.02em;
+    }
+    .service-row-title {
+      font-family: var(--font-head);
+      font-size: clamp(1.75rem, 2.8vw, 2.25rem);
+      font-weight: 700;
+      color: var(--navy);
+      line-height: 1.1;
+      margin-bottom: 12px;
+      letter-spacing: -0.01em;
+    }
+    .service-row-desc {
+      font-family: var(--font-body);
+      font-size: 1rem;
+      color: var(--grey);
+      line-height: 1.8;
+      margin-bottom: 32px;
+    }
+    .service-row-img-wrap {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: linear-gradient(135deg, hsl(190,43%,18%) 0%, hsl(210,8%,12%) 100%);
+    }
+    .compliance-panel {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: var(--navy);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 36px 40px;
+      gap: 0;
+    }
+    .compliance-panel-title {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 28px;
+    }
+    .compliance-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .compliance-item:last-child { border-bottom: none; }
+    .compliance-item svg {
+      width: 18px;
+      height: 18px;
+      stroke: #22c55e;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
+    }
+    .compliance-item-label {
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: rgba(255,255,255,0.85);
+      flex: 1;
+    }
+    .compliance-item-badge {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.05em;
+    }
+
+    .service-row-img {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      object-fit: cover;
+      display: block;
+      border-radius: 12px;
+    }
+    .service-row-img-wrap::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      background: linear-gradient(to top, rgba(0,0,0,0.2) 0%, transparent 55%);
+      pointer-events: none;
+    }
+
+    /* ─── SKILLS ───────────────────────────────────────────────── */
+    #why {
+      padding: 100px 0;
+      background: var(--bg-alt);
+    }
+
+    .skills-intro {
+      text-align: center;
+      margin-bottom: 64px;
+    }
+
+    .skills-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 14px;
+    }
+
+    .skill-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 20px;
+      background: var(--bg-card);
+      border: 1px solid hsl(150, 8%, 85%);
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+      cursor: default;
+    }
+    .skill-item:hover {
+      transform: translateY(-3px);
+      border-color: var(--blue);
+      box-shadow: 0 8px 24px hsla(43,67%,52%,0.14);
+    }
+
+    .skill-icon {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      border-radius: 8px;
+      background: hsla(43,67%,52%,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .skill-icon svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--blue);
+      stroke-width: 1.9;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .skill-label {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--navy);
+      line-height: 1.3;
+    }
+
+    /* ─── LIVE GRID STATUS ─────────────────────────────────────── */
+    #grid-status {
+      padding: 80px 0;
+      background: var(--navy);
+      position: relative;
+      overflow: hidden;
+    }
+    #grid-status::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(hsla(43,67%,52%,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, hsla(43,67%,52%,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+    .grid-status-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .grid-status-title {
+      font-family: var(--font-head);
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      color: var(--white);
+      line-height: 1.1;
+      margin-top: 6px;
+    }
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: hsla(43,67%,52%,0.12);
+      border: 1px solid hsla(43,67%,52%,0.3);
+      border-radius: 100px;
+      padding: 7px 16px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: hsl(43, 80%, 72%);
+      white-space: nowrap;
+    }
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse-live 1.4s infinite;
+    }
+    @keyframes pulse-live {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+      50% { opacity: 0.7; box-shadow: 0 0 0 5px rgba(34,197,94,0); }
+    }
+    .grid-metrics {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+    }
+    .metric-card {
+      background: hsla(144, 14%, 96%, 0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: var(--radius);
+      padding: 28px 22px;
+      transition: border-color var(--transition), background var(--transition);
+    }
+    .metric-card:hover {
+      border-color: hsla(43,67%,52%,0.3);
+      background: hsla(144, 14%, 96%, 0.07);
+    }
+    .metric-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.38);
+      margin-bottom: 14px;
+    }
+    .metric-value {
+      font-family: var(--font-head);
+      font-size: clamp(1.6rem, 2.2vw, 2.2rem);
+      font-weight: 700;
+      color: var(--white);
+      line-height: 1;
+      margin-bottom: 4px;
+      transition: color 0.35s ease;
+    }
+    .metric-unit {
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.3);
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+    .metric-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .metric-tag.green { color: #4ade80; }
+    .metric-tag.amber { color: hsl(43, 80%, 72%); }
+    .metric-tag.teal  { color: hsl(190, 60%, 58%); }
+    .metric-tag-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+    .grid-disclaimer {
+      margin-top: 20px;
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.2);
+      text-align: right;
+      font-style: italic;
+    }
+
+    /* ─── ABOUT IMAGE ───────────────────────────────────────────── */
+    .about-image-wrap {
+      position: relative;
+      border-radius: var(--radius);
+      overflow: hidden;
+      min-height: 320px;
+      background: linear-gradient(135deg, hsl(190, 43%, 18%) 0%, hsl(210, 8%, 12%) 60%, hsl(190, 43%, 22%) 100%);
+    }
+    .about-mission-img {
+      width: 100%;
+      height: 100%;
+      min-height: 320px;
+      object-fit: cover;
+      border-radius: var(--radius);
+      display: block;
+    }
+    .about-image-wrap::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: var(--radius);
+      background: linear-gradient(to top, rgba(0,0,0,0.35) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* ─── TEAM STATS ────────────────────────────────────────────── */
+    #stats {
+      padding: 64px 0;
+      background: var(--bg-alt);
+      border-top: 1px solid hsl(150, 8%, 85%);
+      border-bottom: 1px solid hsl(150, 8%, 85%);
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+    }
+    .stat-item {
+      text-align: center;
+      padding: 24px 16px;
+      border-right: 1px solid hsl(150, 8%, 85%);
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-value {
+      font-family: var(--font-head);
+      font-size: clamp(2.5rem, 5vw, 3.5rem);
+      font-weight: 700;
+      color: var(--blue);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--grey-dim);
+      line-height: 1.4;
+    }
+
+    /* ─── TESTIMONIALS ──────────────────────────────────────────── */
+    #testimonials {
+      padding: 100px 0;
+      background: var(--bg-alt);
+    }
+    .testimonials-intro {
+      text-align: center;
+      margin-bottom: 64px;
+    }
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .testimonial-card {
+      background: var(--bg-card);
+      border: 1px solid hsl(150, 8%, 85%);
+      border-radius: var(--radius);
+      padding: 36px 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+    .testimonial-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px hsla(43,67%,52%,0.12);
+    }
+    .testimonial-quote {
+      font-family: var(--font-head);
+      font-style: italic;
+      font-size: 1.05rem;
+      color: var(--navy);
+      line-height: 1.65;
+      flex: 1;
+    }
+    .testimonial-quote::before {
+      content: '\201C';
+      color: var(--blue);
+      font-size: 2.2rem;
+      line-height: 0;
+      vertical-align: -0.45em;
+      margin-right: 3px;
+    }
+    .testimonial-author {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .avatar-fallback {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: hsla(190, 43%, 28%, 0.15);
+      border: 1px solid hsla(190, 43%, 28%, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-body);
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--teal);
+      flex-shrink: 0;
+      letter-spacing: 0.03em;
+    }
+    .author-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--navy);
+      line-height: 1.3;
+    }
+    .author-role {
+      font-size: 0.78rem;
+      color: var(--grey-dim);
+      line-height: 1.3;
+    }
+
+    /* ─── JOIN OUR MISSION CTA ──────────────────────────────────── */
+    #cta-mission {
+      padding: 96px 0;
+      background: var(--navy);
+      text-align: center;
+    }
+    #cta-mission .section-label { color: var(--blue); }
+    #cta-mission .section-headline {
+      color: var(--white);
+      max-width: 600px;
+      margin: 0 auto 20px;
+    }
+    .cta-sub {
+      font-size: 1.05rem;
+      color: rgba(255,255,255,0.65);
+      max-width: 520px;
+      margin: 0 auto 40px;
+      line-height: 1.7;
+    }
+
+    /* ─── CONTACT ───────────────────────────────────────────────── */
+    #contact {
+      padding: 100px 0;
+      background: var(--bg-alt);
+    }
+
+    .contact-intro {
+      text-align: center;
+      margin-bottom: 64px;
+    }
+    .contact-intro p {
+      font-size: 1.05rem;
+      color: var(--grey);
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    .contact-layout {
+      display: grid;
+      grid-template-columns: 3fr 2fr;
+      gap: 48px;
+      align-items: start;
+    }
+
+    /* Form */
+    .contact-form {
+      background: var(--bg-card);
+      border: 1px solid hsl(150, 8%, 85%);
+      border-radius: var(--radius);
+      padding: 44px 40px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--grey-dim);
+      margin-bottom: 8px;
+    }
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      background: hsl(150, 8%, 94%);
+      border: 1px solid hsl(150, 8%, 82%);
+      border-radius: 6px;
+      padding: 13px 16px;
+      font-family: var(--font-body);
+      font-size: 0.95rem;
+      color: var(--navy);
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+    .form-group input::placeholder,
+    .form-group textarea::placeholder {
+      color: hsl(150, 5%, 68%);
+    }
+    .form-group input:focus,
+    .form-group textarea:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px hsla(43,67%,52%,0.12);
+      background: #FFFFFF;
+    }
+    .form-group textarea {
+      resize: vertical;
+      min-height: 130px;
+    }
+
+    .form-note {
+      font-size: 0.8rem;
+      color: var(--grey-dim);
+      margin-top: 16px;
+      text-align: center;
+    }
+
+    /* Contact info */
+    .contact-info {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .contact-card {
+      background: var(--bg-card);
+      border: 1px solid hsl(150, 8%, 85%);
+      border-radius: var(--radius);
+      padding: 28px 28px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      transition: border-color var(--transition);
+    }
+    .contact-card:hover { border-color: var(--blue); }
+
+    .contact-card-flag { font-size: 2rem; margin-bottom: 10px; }
+    .contact-card-title {
+      font-family: var(--font-head);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 4px;
+    }
+    .contact-card-sub {
+      font-size: 0.85rem;
+      color: var(--grey-dim);
+      margin-bottom: 8px;
+    }
+    .contact-card-email {
+      font-size: 0.9rem;
+      color: var(--blue);
+      font-weight: 500;
+    }
+
+    /* ─── FOOTER ────────────────────────────────────────────────── */
+    footer {
+      background: var(--navy);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding: 60px 0 0;
+    }
+
+    .footer-main {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 48px;
+      padding-bottom: 48px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .footer-brand {}
+    .footer-logo-img {
+      height: 44px;
+      width: auto;
+      display: block;
+      background: #FFFFFF;
+      border-radius: 6px;
+      padding: 5px 10px;
+      margin-bottom: 12px;
+    }
+    .footer-tagline {
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.42);
+      letter-spacing: 0.03em;
+    }
+
+    .footer-nav-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.42);
+      margin-bottom: 16px;
+    }
+    .footer-nav-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .footer-nav-list a {
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.68);
+      transition: color var(--transition);
+    }
+    .footer-nav-list a:hover { color: var(--white); }
+
+    .social-links {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .social-link {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      color: rgba(255,255,255,0.55);
+      transition: all var(--transition);
+      cursor: pointer;
+    }
+    .social-link:hover {
+      background: hsla(43,67%,52%,0.2);
+      border-color: var(--blue);
+      color: var(--white);
+    }
+
+    .footer-bottom {
+      padding: 20px 0;
+      text-align: center;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.32);
+    }
+
+    /* ─── STAFF LOGIN MODAL ─────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(13,27,42,0.72);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 9000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal-card {
+      background: hsl(144, 14%, 96%);
+      border: 1px solid hsl(150, 8%, 85%);
+      border-radius: 12px;
+      padding: 48px 44px;
+      width: 100%;
+      max-width: 440px;
+      position: relative;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.16);
+      transform: translateY(20px) scale(0.97);
+      transition: transform 0.25s ease;
+    }
+    .modal-overlay.open .modal-card {
+      transform: none;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: hsl(150, 8%, 88%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      color: var(--grey);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .modal-close:hover {
+      background: hsl(150, 8%, 82%);
+      color: var(--navy);
+    }
+
+    .modal-logo {
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .modal-logo-img {
+      height: 40px;
+      width: auto;
+      margin: 0 auto 8px;
+      display: block;
+      mix-blend-mode: multiply;
+    }
+    .modal-subtitle {
+      font-size: 0.85rem;
+      color: var(--grey-dim);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    .modal-divider {
+      height: 1px;
+      background: hsl(150, 8%, 85%);
+      margin: 28px 0;
+    }
+
+    .modal-note {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--grey-dim);
+      margin-top: 20px;
+      line-height: 1.6;
+    }
+    .modal-note a {
+      color: var(--blue);
+    }
+
+    /* ─── RESPONSIVE ────────────────────────────────────────────── */
+    @media (max-width: 1024px) {
+      .service-row-inner { gap: 40px; }
+      .footer-main { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 768px) {
+      .container { padding: 0 20px; }
+
+      .nav-links,
+      .nav-actions { display: none; }
+      .hamburger { display: flex; }
+
+      #hero { padding-top: 90px; min-height: 95vh; }
+      .hero-title { font-size: clamp(2.4rem, 10vw, 4rem); }
+
+      .trust-grid { grid-template-columns: repeat(2, 1fr); }
+      .trust-item { border-right: none; border-bottom: 1px solid hsl(150, 8%, 85%); }
+      .trust-item:nth-child(odd) { border-right: 1px solid hsl(150, 8%, 85%); }
+      .trust-item:last-child { border-bottom: none; }
+
+      .about-grid { grid-template-columns: 1fr; gap: 40px; }
+      .about-image-wrap { order: -1; }
+
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .stat-item { border-right: none; border-bottom: 1px solid hsl(150, 8%, 85%); }
+      .stat-item:nth-child(odd) { border-right: 1px solid hsl(150, 8%, 85%); }
+      .stat-item:last-child { border-bottom: none; }
+      .stat-item:nth-last-child(2) { border-bottom: none; }
+
+      .service-row { padding: 56px 0; }
+      .service-row-inner { grid-template-columns: 1fr; gap: 32px; }
+      .service-row-inner.reversed .service-row-text    { order: 0; }
+      .service-row-inner.reversed .service-row-img-wrap { order: 0; }
+
+      .why-grid { grid-template-columns: 1fr; }
+
+      .testimonials-grid { grid-template-columns: 1fr; }
+
+      #cta-mission { padding: 70px 0; }
+
+      .contact-layout { grid-template-columns: 1fr; }
+      .contact-form { padding: 28px 24px; }
+      .form-row { grid-template-columns: 1fr; }
+
+      .footer-main { grid-template-columns: 1fr; gap: 32px; padding-bottom: 32px; }
+
+      .modal-card { margin: 20px; padding: 36px 28px; }
+
+      #about, #services, #why, #contact { padding: 70px 0; }
+    }
+
+    @media (max-width: 480px) {
+      .trust-grid { grid-template-columns: 1fr; }
+      .trust-item { border-right: none !important; }
+      .hero-ctas { flex-direction: column; }
+      .hero-ctas .btn { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ─── NAVIGATION ─────────────────────────────────────────── -->
+  <nav id="navbar">
+    <a href="#hero" class="nav-logo">
+      <img src="logo.jpeg?v=2" alt="DAFEGEN" class="nav-logo-img" />
+    </a>
+
+    <ul class="nav-links">
+      <li><a href="#about">About</a></li>
+      <li><a href="#services">Services</a></li>
+      <li><a href="#why">Why Dafegen</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+
+    <div class="nav-actions">
+      <button class="btn btn-outline-purple" onclick="openModal()">Login</button>
+      <a href="#contact" class="btn btn-primary">Get in Touch</a>
+    </div>
+
+    <div class="hamburger" id="hamburger" onclick="toggleMobileNav()" aria-label="Toggle navigation">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+  </nav>
+
+  <!-- Mobile Nav -->
+  <div class="mobile-nav" id="mobileNav">
+    <a href="#about" onclick="closeMobileNav()">About</a>
+    <a href="#services" onclick="closeMobileNav()">Services</a>
+    <a href="#why" onclick="closeMobileNav()">Why Dafegen</a>
+    <a href="#contact" onclick="closeMobileNav()">Contact</a>
+    <div class="mobile-nav-actions">
+      <button class="btn btn-outline-purple" onclick="openModal(); closeMobileNav()">Login</button>
+      <a href="#contact" class="btn btn-primary" onclick="closeMobileNav()">Get in Touch</a>
+    </div>
+  </div>
+
+  <!-- ─── HERO ───────────────────────────────────────────────── -->
+  <section id="hero">
+
+    <div class="container">
+      <div class="hero-content">
+        <div class="hero-eyebrow reveal">
+          <span class="dot"></span>
+          Energy Intelligence Platform
+        </div>
+
+        <h1 class="hero-title reveal reveal-delay-1">
+          Powering Nepal's<br/>
+          <span class="accent">Energy Future</span>
+        </h1>
+
+        <p class="hero-sub reveal reveal-delay-2">
+          Next-generation billing, metering, and grid management software
+          purpose-built for Nepal's hydropower-driven energy market.
+          From the Himalayas to every household.
+        </p>
+
+        <div class="hero-ctas reveal reveal-delay-3">
+          <a href="#services" class="btn btn-primary">Explore Our Services</a>
+          <a href="#about" class="btn btn-outline-white">About Us</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-bird-bg" aria-hidden="true">🦚</div>
+  </section>
+
+  <!-- ─── TRUST BAR ──────────────────────────────────────────── -->
+  <section id="trust">
+    <div class="container">
+      <div class="trust-grid">
+        <div class="trust-item reveal">
+          <span class="trust-icon"><i data-lucide="landmark"></i></span>
+          <div class="trust-text">
+            <strong>UK Registered Company</strong>
+            <span>England &amp; Wales</span>
+          </div>
+        </div>
+        <div class="trust-item reveal reveal-delay-1">
+          <span class="trust-icon"><i data-lucide="zap"></i></span>
+          <div class="trust-text">
+            <strong>Energy Sector Specialists</strong>
+            <span>Deep domain expertise</span>
+          </div>
+        </div>
+        <div class="trust-item reveal reveal-delay-2">
+          <span class="trust-icon"><i data-lucide="map-pin"></i></span>
+          <div class="trust-text">
+            <strong>Nepal Market Experts</strong>
+            <span>NEA · AEPC · MoEWRI</span>
+          </div>
+        </div>
+        <div class="trust-item reveal reveal-delay-3">
+          <span class="trust-icon"><i data-lucide="code-2"></i></span>
+          <div class="trust-text">
+            <strong>100% Bespoke Software</strong>
+            <span>No off-the-shelf compromises</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── ABOUT ──────────────────────────────────────────────── -->
+  <section id="about">
+    <div class="container">
+      <div class="about-grid">
+        <!-- Left col -->
+        <div>
+          <p class="section-label reveal">Our Mission</p>
+          <h2 class="section-headline reveal reveal-delay-1">
+            Engineering Nepal's <span style="color:var(--blue)">Digital Grid</span>
+          </h2>
+          <div class="about-body reveal reveal-delay-2">
+            <p>
+              Nepal sits on one of the world's greatest untapped energy reserves —
+              42,000 MW of economically viable hydropower. Yet millions still face
+              load shedding, billing inaccuracies, and grid instability.
+            </p>
+            <p>
+              DAFEGEN exists to close this gap. We bring world-class energy software
+              to Nepal's utilities and distribution companies, enabling them to serve
+              every consumer with the accuracy, reliability, and intelligence they
+              deserve.
+            </p>
+            <p style="color:var(--navy);font-weight:500;">
+              Our vision: a digitally connected, efficiently managed energy system
+              that powers Nepal's economic transformation — from hydropower generation
+              to the last meter in the most remote village.
+            </p>
+          </div>
+          <a href="#services" class="text-link reveal reveal-delay-3">
+            Explore our services <span>→</span>
+          </a>
+        </div>
+
+        <!-- Right col — Nepal transmission lines image -->
+        <div class="reveal reveal-delay-2 about-image-wrap">
+          <img
+            src="https://images.unsplash.com/photo-1706129295592-93f431c6b675?auto=format&fit=crop&w=900&q=80"
+            alt="High voltage power lines in mountain terrain"
+            class="about-mission-img"
+            onerror="this.style.display='none'"
+          />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── TEAM STATS ───────────────────────────────────────── -->
+  <section id="stats">
+    <div class="container">
+      <div class="stats-grid">
+        <div class="stat-item reveal">
+          <div class="stat-value">60+</div>
+          <div class="stat-label">Engineers &amp; Energy Specialists</div>
+        </div>
+        <div class="stat-item reveal reveal-delay-1">
+          <div class="stat-value">2</div>
+          <div class="stat-label">Global Offices — UK &amp; Kathmandu</div>
+        </div>
+        <div class="stat-item reveal reveal-delay-2">
+          <div class="stat-value">2026</div>
+          <div class="stat-label">Founded in Kathmandu</div>
+        </div>
+        <div class="stat-item reveal reveal-delay-3">
+          <div class="stat-value">15+</div>
+          <div class="stat-label">Nationalities on Our Team</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── SERVICES ───────────────────────────────────────────── -->
+  <section id="services">
+
+    <!-- Dark hero header -->
+    <div class="services-hero-panel">
+      <div class="container">
+        <p class="section-label reveal">What We Build</p>
+        <h2 class="section-headline reveal reveal-delay-1">
+          The Complete Energy <span class="accent">Software Stack</span>
+        </h2>
+        <p class="services-hero-tagline reveal reveal-delay-2">
+          Seven integrated modules engineered for Nepal's unique energy landscape.
+          Each can operate independently or as a unified platform.
+        </p>
+        <div class="platform-badges reveal reveal-delay-3">
+          <div class="platform-badge">
+            <span class="platform-badge-icon"><i data-lucide="zap"></i></span>
+            <div>
+              <div class="platform-badge-title">Real-Time Processing</div>
+              <div class="platform-badge-sub">Sub-second data ingestion</div>
+            </div>
+          </div>
+          <div class="platform-badge">
+            <span class="platform-badge-icon"><i data-lucide="database"></i></span>
+            <div>
+              <div class="platform-badge-title">Cloud-Native</div>
+              <div class="platform-badge-sub">Deployed on local data centres</div>
+            </div>
+          </div>
+          <div class="platform-badge">
+            <span class="platform-badge-icon"><i data-lucide="shield"></i></span>
+            <div>
+              <div class="platform-badge-title">Enterprise Security</div>
+              <div class="platform-badge-sub">ISO 27001 compliant</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1 — Energy Trading Platforms -->
+    <div class="service-row">
+      <div class="container">
+        <div class="service-row-inner reveal">
+          <div class="service-row-text">
+            <div class="service-row-icon-wrap"><i data-lucide="zap"></i></div>
+            <p class="service-row-tagline">Trade Smarter. Move Faster.</p>
+            <h3 class="service-row-title">Energy Trading Platforms</h3>
+            <p class="service-row-desc">Real-time transaction software connecting energy buyers and sellers across Nepal's power market.</p>
+            <a href="#contact" class="btn btn-primary">Request Demo <span>→</span></a>
+          </div>
+          <div class="service-row-img-wrap reveal reveal-delay-1">
+            <img src="https://images.unsplash.com/photo-1466611653911-95081537e5b7?auto=format&fit=crop&w=900&q=80" alt="Energy trading platform" class="service-row-img" onerror="this.style.display='none'" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 — Grid Management Systems -->
+    <div class="service-row">
+      <div class="container">
+        <div class="service-row-inner reversed reveal">
+          <div class="service-row-text">
+            <div class="service-row-icon-wrap"><i data-lucide="gauge"></i></div>
+            <p class="service-row-tagline">Visibility Across Every Node.</p>
+            <h3 class="service-row-title">Grid Management Systems</h3>
+            <p class="service-row-desc">Tools for monitoring, managing and optimising power distribution networks and load balancing.</p>
+            <a href="#contact" class="btn btn-primary">Request Demo <span>→</span></a>
+          </div>
+          <div class="service-row-img-wrap reveal reveal-delay-1">
+            <img src="https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&w=900&q=80" alt="Grid management systems" class="service-row-img" onerror="this.style.display='none'" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 — Billing & Revenue Management -->
+    <div class="service-row">
+      <div class="container">
+        <div class="service-row-inner reveal">
+          <div class="service-row-text">
+            <div class="service-row-icon-wrap"><i data-lucide="receipt"></i></div>
+            <p class="service-row-tagline">Accurate. Automated. Auditable.</p>
+            <h3 class="service-row-title">Billing &amp; Revenue Management</h3>
+            <p class="service-row-desc">Automated billing, tariff management and revenue assurance systems for energy suppliers.</p>
+            <a href="#contact" class="btn btn-primary">Request Demo <span>→</span></a>
+          </div>
+          <div class="service-row-img-wrap reveal reveal-delay-1">
+            <img src="https://images.unsplash.com/photo-1590944667245-8ad4c2abf8ae?auto=format&fit=crop&w=900&q=80" alt="Smart energy meter" class="service-row-img" onerror="this.style.display='none'" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 — Energy Data Dashboards -->
+    <div class="service-row">
+      <div class="container">
+        <div class="service-row-inner reversed reveal">
+          <div class="service-row-text">
+            <div class="service-row-icon-wrap"><i data-lucide="bar-chart-3"></i></div>
+            <p class="service-row-tagline">Data That Drives Decisions.</p>
+            <h3 class="service-row-title">Energy Data Dashboards</h3>
+            <p class="service-row-desc">Analytics and reporting platforms for energy consumption, generation and demand forecasting.</p>
+            <a href="#contact" class="btn btn-primary">Request Demo <span>→</span></a>
+          </div>
+          <div class="service-row-img-wrap reveal reveal-delay-1">
+            <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=900&q=80" alt="Energy data dashboards" class="service-row-img" onerror="this.style.display='none'" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5 — Regulatory Compliance Tools -->
+    <div class="service-row">
+      <div class="container">
+        <div class="service-row-inner reveal">
+          <div class="service-row-text">
+            <div class="service-row-icon-wrap"><i data-lucide="shield"></i></div>
+            <p class="service-row-tagline">Built for Nepal's Regulatory Framework.</p>
+            <h3 class="service-row-title">Regulatory Compliance Tools</h3>
+            <p class="service-row-desc">Software aligned to Nepal's energy regulatory requirements including NEA, AEPC and MoEWRI standards.</p>
+            <a href="#contact" class="btn btn-primary">Request Demo <span>→</span></a>
+          </div>
+          <div class="service-row-img-wrap reveal reveal-delay-1">
+            <div class="compliance-panel">
+              <div class="compliance-panel-title">Compliance Status</div>
+              <div class="compliance-item">
+                <i data-lucide="check-circle-2"></i>
+                <span class="compliance-item-label">NEA Standards</span>
+                <span class="compliance-item-badge">Verified</span>
+              </div>
+              <div class="compliance-item">
+                <i data-lucide="check-circle-2"></i>
+                <span class="compliance-item-label">AEPC Certification</span>
+                <span class="compliance-item-badge">Verified</span>
+              </div>
+              <div class="compliance-item">
+                <i data-lucide="check-circle-2"></i>
+                <span class="compliance-item-label">MoEWRI Aligned</span>
+                <span class="compliance-item-badge">Verified</span>
+              </div>
+              <div class="compliance-item">
+                <i data-lucide="check-circle-2"></i>
+                <span class="compliance-item-label">ISO 27001 Security</span>
+                <span class="compliance-item-badge">Certified</span>
+              </div>
+              <div class="compliance-item">
+                <i data-lucide="check-circle-2"></i>
+                <span class="compliance-item-label">Tariff Regulations</span>
+                <span class="compliance-item-badge">Compliant</span>
+              </div>
+              <div class="compliance-item">
+                <i data-lucide="check-circle-2"></i>
+                <span class="compliance-item-label">Data Privacy Act</span>
+                <span class="compliance-item-badge">Compliant</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 — Custom ERP & CRM for Energy -->
+    <div class="service-row">
+      <div class="container">
+        <div class="service-row-inner reversed reveal">
+          <div class="service-row-text">
+            <div class="service-row-icon-wrap"><i data-lucide="database"></i></div>
+            <p class="service-row-tagline">Tailored from the Ground Up.</p>
+            <h3 class="service-row-title">Custom ERP &amp; CRM for Energy</h3>
+            <p class="service-row-desc">Tailored enterprise resource and customer management tools built specifically for energy companies.</p>
+            <a href="#contact" class="btn btn-primary">Request Demo <span>→</span></a>
+          </div>
+          <div class="service-row-img-wrap reveal reveal-delay-1">
+            <img src="https://images.unsplash.com/photo-1666875753105-c63a6f3bdc86?auto=format&fit=crop&w=900&q=80" alt="Custom ERP and CRM" class="service-row-img" onerror="this.style.display='none'" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7 — EV Charging & Transformation -->
+    <div class="service-row">
+      <div class="container">
+        <div class="service-row-inner reveal">
+          <div class="service-row-text">
+            <div class="service-row-icon-wrap"><i data-lucide="car"></i></div>
+            <p class="service-row-tagline">Smart Charging for Nepal's Electric Future.</p>
+            <h3 class="service-row-title">EV Charging &amp; Transformation</h3>
+            <p class="service-row-desc">An integrated EV infrastructure management platform designed for Nepal's rapidly growing electric vehicle fleet. From Kathmandu's electric tempos and two-wheelers to highway fast-charging corridors — manage every charger, session, and payment through one unified system.</p>
+            <a href="#contact" class="btn btn-primary">Request Demo <span>→</span></a>
+          </div>
+          <div class="service-row-img-wrap reveal reveal-delay-1">
+            <img src="https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&w=900&q=80" alt="EV charging infrastructure" class="service-row-img" onerror="this.style.display='none'" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ─── SKILLS ─────────────────────────────────────────────── -->
+  <section id="why">
+    <div class="container">
+      <div class="skills-intro">
+        <p class="section-label reveal">What We Do Best</p>
+        <h2 class="section-headline reveal reveal-delay-1">Our Core Skills</h2>
+      </div>
+
+      <div class="skills-grid">
+
+        <div class="skill-item reveal">
+          <div class="skill-icon"><i data-lucide="zap"></i></div>
+          <span class="skill-label">Energy Trading Platforms</span>
+        </div>
+
+        <div class="skill-item reveal reveal-delay-1">
+          <div class="skill-icon"><i data-lucide="gauge"></i></div>
+          <span class="skill-label">Grid Management Systems</span>
+        </div>
+
+        <div class="skill-item reveal reveal-delay-2">
+          <div class="skill-icon"><i data-lucide="receipt"></i></div>
+          <span class="skill-label">Billing &amp; Revenue Management</span>
+        </div>
+
+        <div class="skill-item reveal reveal-delay-3">
+          <div class="skill-icon"><i data-lucide="bar-chart-3"></i></div>
+          <span class="skill-label">Energy Data Dashboards</span>
+        </div>
+
+        <div class="skill-item reveal">
+          <div class="skill-icon"><i data-lucide="shield"></i></div>
+          <span class="skill-label">Regulatory Compliance Tools</span>
+        </div>
+
+        <div class="skill-item reveal reveal-delay-1">
+          <div class="skill-icon"><i data-lucide="database"></i></div>
+          <span class="skill-label">Custom ERP &amp; CRM</span>
+        </div>
+
+        <div class="skill-item reveal reveal-delay-2">
+          <div class="skill-icon"><i data-lucide="car"></i></div>
+          <span class="skill-label">EV Charging Infrastructure</span>
+        </div>
+
+        <div class="skill-item reveal reveal-delay-3">
+          <div class="skill-icon"><i data-lucide="cpu"></i></div>
+          <span class="skill-label">AI Demand Forecasting</span>
+        </div>
+
+        <div class="skill-item reveal">
+          <div class="skill-icon"><i data-lucide="cloud"></i></div>
+          <span class="skill-label">Cloud-Native Architecture</span>
+        </div>
+
+        <div class="skill-item reveal reveal-delay-1">
+          <div class="skill-icon"><i data-lucide="globe"></i></div>
+          <span class="skill-label">Local Market Expertise</span>
+        </div>
+
+        <div class="skill-item reveal reveal-delay-2">
+          <div class="skill-icon"><i data-lucide="activity"></i></div>
+          <span class="skill-label">SCADA Integration</span>
+        </div>
+
+        <div class="skill-item reveal reveal-delay-3">
+          <div class="skill-icon"><i data-lucide="code-2"></i></div>
+          <span class="skill-label">API &amp; Systems Integration</span>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── CONTACT ────────────────────────────────────────────── -->
+  <section id="contact">
+    <div class="container">
+      <div class="contact-intro">
+        <p class="section-label reveal">Get in Touch</p>
+        <h2 class="section-headline reveal reveal-delay-1">Let's Build Something Together</h2>
+        <p class="reveal reveal-delay-2">
+          Whether you're an energy company, government body, or investor —
+          we'd love to hear from you.
+        </p>
+      </div>
+
+      <div class="contact-layout">
+        <!-- Form -->
+        <div class="contact-form reveal">
+          <form id="contactForm" onsubmit="handleFormSubmit(event)">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="fullName">Full Name</label>
+                <input type="text" id="fullName" name="fullName" placeholder="Your full name" required />
+              </div>
+              <div class="form-group">
+                <label for="organisation">Organisation</label>
+                <input type="text" id="organisation" name="organisation" placeholder="Your organisation" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="email">Email Address</label>
+              <input type="email" id="email" name="email" placeholder="you@organisation.com" required />
+            </div>
+            <div class="form-group">
+              <label for="message">Message</label>
+              <textarea id="message" name="message" placeholder="Tell us about your project or enquiry..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:15px;">
+              Send Message
+            </button>
+            <p class="form-note">We aim to respond within 1 business day.</p>
+          </form>
+        </div>
+
+        <!-- Contact info -->
+        <div class="contact-info reveal reveal-delay-2">
+
+          <div class="contact-card">
+            <div class="contact-card-flag">🇬🇧</div>
+            <div class="contact-card-title">United Kingdom</div>
+            <div class="contact-card-sub">Registered Office, England &amp; Wales</div>
+            <div class="contact-card-email">info@dafegen.com</div>
+          </div>
+
+          <div class="contact-card">
+            <div class="contact-card-flag">🇳🇵</div>
+            <div class="contact-card-title">Nepal</div>
+            <div class="contact-card-sub">Kathmandu Operations</div>
+            <div class="contact-card-email">info@dafegen.com</div>
+          </div>
+
+          <div style="background:var(--bg-card);border:1px solid hsl(150, 8%, 85%);border-radius:var(--radius);padding:24px 28px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+            <p style="font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--grey-dim);margin-bottom:10px;">Please Note</p>
+            <p style="font-size:0.85rem;color:var(--grey);line-height:1.65;">
+              Our domain is not yet live. Emails sent to info@dafegen.com will be active once our domain is set up. In the meantime, use this form and we will be in touch.
+            </p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── JOIN OUR MISSION CTA ────────────────────────────── -->
+  <section id="cta-mission">
+    <div class="container">
+      <p class="section-label reveal">Work With Us</p>
+      <h2 class="section-headline reveal reveal-delay-1">Join Our <span style="color:var(--blue)">Mission</span></h2>
+      <p class="cta-sub reveal reveal-delay-2">
+        We're always looking for talented engineers and energy professionals
+        who share our vision for Nepal's energy future.
+      </p>
+      <div class="reveal reveal-delay-3">
+        <a href="#contact" class="btn btn-primary">
+          Get in Touch <span style="margin-left:4px;">→</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── FOOTER ─────────────────────────────────────────────── -->
+  <footer>
+    <div class="container">
+      <div class="footer-main">
+
+        <div class="footer-brand">
+          <img src="logo.jpeg?v=2" alt="DAFEGEN" class="footer-logo-img" />
+          <p class="footer-tagline">Bespoke Energy Software · UK Registered · Nepal Focused</p>
+        </div>
+
+        <div>
+          <p class="footer-nav-title">Navigation</p>
+          <ul class="footer-nav-list">
+            <li><a href="#about">About</a></li>
+            <li><a href="#services">Services</a></li>
+            <li><a href="#why">Why Dafegen</a></li>
+            <li><a href="#contact">Contact</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="footer-nav-title">Connect</p>
+          <div class="social-links">
+            <a class="social-link" href="#" title="LinkedIn" aria-label="LinkedIn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z"/>
+                <circle cx="4" cy="4" r="2"/>
+              </svg>
+            </a>
+            <a class="social-link" href="#" title="X / Twitter" aria-label="X / Twitter">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </a>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="footer-bottom">
+        &copy; 2026 DAFEGEN. All rights reserved. Registered in England &amp; Wales.
+      </div>
+    </div>
+  </footer>
+
+  <!-- ─── STAFF LOGIN MODAL ──────────────────────────────────── -->
+  <div class="modal-overlay" id="staffModal" onclick="handleOverlayClick(event)">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+
+      <button class="modal-close" onclick="closeModal()" aria-label="Close modal">✕</button>
+
+      <div class="modal-logo">
+        <img src="logo.jpeg?v=2" alt="DAFEGEN" class="modal-logo-img" />
+        <div class="modal-subtitle" id="modalTitle">Login</div>
+      </div>
+
+      <div class="modal-divider"></div>
+
+      <form onsubmit="event.preventDefault()">
+        <div class="form-group">
+          <label for="staffEmail">Email Address</label>
+          <input type="email" id="staffEmail" placeholder="you@dafegen.com" autocomplete="email" />
+        </div>
+        <div class="form-group" style="margin-bottom:24px;">
+          <label for="staffPassword">Password</label>
+          <input type="password" id="staffPassword" placeholder="••••••••••" autocomplete="current-password" />
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;">
+          Sign In
+        </button>
+      </form>
+
+      <p class="modal-note">
+        Staff access only. For access requests contact<br/>
+        <a href="mailto:admin@dafegen.com">admin@dafegen.com</a>
+      </p>
+
+    </div>
+  </div>
+
+  <!-- ─── JAVASCRIPT ─────────────────────────────────────────── -->
+  <script>
+    /* ── Scroll Reveal ──────────────────────────────────────── */
+    (function() {
+      const els = document.querySelectorAll('.reveal');
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.classList.add('visible');
+            observer.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.12 });
+      els.forEach(el => observer.observe(el));
+
+      // Trigger hero reveals immediately
+      setTimeout(() => {
+        document.querySelectorAll('#hero .reveal').forEach(el => el.classList.add('visible'));
+        document.querySelectorAll('#trust .reveal').forEach(el => el.classList.add('visible'));
+      }, 150);
+    })();
+
+    /* ── Active nav link on scroll ─────────────────────────── */
+    (function() {
+      const sections = ['about','services','why','contact'];
+      const links = document.querySelectorAll('.nav-links a');
+
+      function updateActive() {
+        let current = '';
+        sections.forEach(id => {
+          const el = document.getElementById(id);
+          if (el && window.scrollY >= el.offsetTop - 120) current = id;
+        });
+        links.forEach(a => {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+        });
+      }
+
+      window.addEventListener('scroll', updateActive, { passive: true });
+    })();
+
+    /* ── Mobile Nav ─────────────────────────────────────────── */
+    function toggleMobileNav() {
+      const nav = document.getElementById('mobileNav');
+      const ham = document.getElementById('hamburger');
+      nav.classList.toggle('open');
+      ham.classList.toggle('open');
+      document.body.style.overflow = nav.classList.contains('open') ? 'hidden' : '';
+    }
+
+    function closeMobileNav() {
+      const nav = document.getElementById('mobileNav');
+      const ham = document.getElementById('hamburger');
+      nav.classList.remove('open');
+      ham.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    /* ── Staff Login Modal ──────────────────────────────────── */
+    function openModal() {
+      const m = document.getElementById('staffModal');
+      m.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => document.getElementById('staffEmail').focus(), 200);
+    }
+
+    function closeModal() {
+      const m = document.getElementById('staffModal');
+      m.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    function handleOverlayClick(e) {
+      if (e.target === document.getElementById('staffModal')) closeModal();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    /* ── Contact form ───────────────────────────────────────── */
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      const btn = e.target.querySelector('button[type="submit"]');
+      const orig = btn.innerHTML;
+      btn.innerHTML = '✓ Message Sent';
+      btn.style.background = 'var(--teal)';
+      btn.style.borderColor = 'var(--teal)';
+      btn.disabled = true;
+      setTimeout(() => {
+        btn.innerHTML = orig;
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        btn.disabled = false;
+        e.target.reset();
+      }, 3500);
+    }
+  </script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>
