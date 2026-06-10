@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DAFEGEN — Bespoke Energy Software for Nepal & Emerging Markets</title>
   <meta name="description" content="DAFEGEN is a UK-registered bespoke software development company delivering tailored solutions for Nepal's energy sector — engineered to UK standards, scaled for the world." />
+  <link rel="canonical" href="https://dafegen.com" />
+  <meta property="og:url" content="https://dafegen.com" />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@300;400;500;600;700;800&display=swap');
 
@@ -1927,7 +1929,8 @@
       <div class="contact-layout">
         <!-- Form -->
         <div class="contact-form reveal">
-          <form id="contactForm" onsubmit="handleFormSubmit(event)">
+          <form id="contactForm" action="https://formspree.io/f/mbdeknag" method="POST">
+            <input type="hidden" name="_next" value="https://dafegen.com/#contact" />
             <div class="form-row">
               <div class="form-group">
                 <label for="fullName">Full Name</label>
@@ -1960,7 +1963,7 @@
             <div class="contact-card-flag">🇬🇧</div>
             <div class="contact-card-title">United Kingdom</div>
             <div class="contact-card-sub">Quatro House, Lyon Way<br>Frimley, Camberley<br>GU16 7ER, England</div>
-            <div class="contact-card-email">info@dafegen.com</div>
+            <a href="mailto:info@dafegen.com" class="contact-card-email">info@dafegen.com</a>
           </div>
 
           <div class="contact-card" style="padding:0;overflow:hidden;">
@@ -1987,15 +1990,9 @@
             <div class="contact-card-flag">🇳🇵</div>
             <div class="contact-card-title">Nepal</div>
             <div class="contact-card-sub">Kathmandu Operations</div>
-            <div class="contact-card-email">info@dafegen.com</div>
+            <a href="mailto:info@dafegen.com" class="contact-card-email">info@dafegen.com</a>
           </div>
 
-          <div style="background:var(--bg-card);border:1px solid hsl(150, 8%, 85%);border-radius:var(--radius);padding:24px 28px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
-            <p style="font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--grey-dim);margin-bottom:10px;">Please Note</p>
-            <p style="font-size:0.85rem;color:var(--grey);line-height:1.65;">
-              Our domain is not yet live. Emails sent to info@dafegen.com will be active once our domain is set up. In the meantime, use this form and we will be in touch.
-            </p>
-          </div>
 
         </div>
       </div>
@@ -2184,23 +2181,6 @@
       if (e.key === 'Escape') closeModal();
     });
 
-    /* ── Contact form ───────────────────────────────────────── */
-    function handleFormSubmit(e) {
-      e.preventDefault();
-      const btn = e.target.querySelector('button[type="submit"]');
-      const orig = btn.innerHTML;
-      btn.innerHTML = '✓ Message Sent';
-      btn.style.background = 'var(--teal)';
-      btn.style.borderColor = 'var(--teal)';
-      btn.disabled = true;
-      setTimeout(() => {
-        btn.innerHTML = orig;
-        btn.style.background = '';
-        btn.style.borderColor = '';
-        btn.disabled = false;
-        e.target.reset();
-      }, 3500);
-    }
   </script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script>lucide.createIcons();</script>
