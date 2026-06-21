@@ -99,8 +99,8 @@ async def _find_outward_junction(
         """
     row = await conn.fetchrow(walk_sql, node_id, max_hops)
     if row and row["lng"] is not None:
-        print(f"[network] outward junction (forward={forward}) → ({row['lng']:.4f},{row['lat']:.4f})")
-        return [float(row["lng"]), float(row["lat"])]
+        print(f"[network] outward junction (forward={forward}) node={row['node_id']} → ({row['lng']:.4f},{row['lat']:.4f})")
+        return (int(row["node_id"]), float(row["lng"]), float(row["lat"]))
     return None
 
 
@@ -151,18 +151,69 @@ async def preview_closure_line(start_node: int, end_node: int, conn: asyncpg.Con
 
     # Only extend if the endpoint is not already at a junction node.
     # Walk along directed motorway edges (same carriageway only).
-    junc_start = None
+    # Use pgr_dijkstra for the extension geometry so it follows actual road edges
+    # (not a straight line) — this keeps the extension on the correct carriageway.
+    junc_start_id = None
     if not await _node_has_impacted_road(conn, start_node):
-        junc_start = await _find_outward_junction(conn, start_node, forward=False)
+        result = await _find_outward_junction(conn, start_node, forward=False)
+        if result:
+            junc_start_id = result[0]
 
-    junc_end = None
+    junc_end_id = None
     if not await _node_has_impacted_road(conn, end_node):
-        junc_end = await _find_outward_junction(conn, end_node, forward=True)
+        result = await _find_outward_junction(conn, end_node, forward=True)
+        if result:
+            junc_end_id = result[0]
 
-    if junc_start:
-        coords = [_offset_toward(junc_start, coords[0], 15)] + coords
-    if junc_end:
-        coords = coords + [_offset_toward(junc_end, coords[-1], 15)]
+    if junc_start_id:
+        ext_row = await conn.fetchrow("""
+            WITH dijkstra AS (
+                SELECT path.edge
+                FROM pgr_dijkstra(
+                    'SELECT id, source, target, cost, reverse_cost FROM road_network WHERE cost > 0',
+                    $1::bigint, $2::bigint, directed := true
+                ) path
+                WHERE path.edge >= 0
+            )
+            SELECT ST_AsGeoJSON(ST_LineMerge(ST_Collect(rn.geom))) AS geojson
+            FROM dijkstra d
+            JOIN road_network rn ON rn.id = d.edge
+        """, junc_start_id, start_node)
+        if ext_row and ext_row["geojson"]:
+            ext_geojson = json.loads(ext_row["geojson"])
+            ext_coords = (
+                [c for ring in ext_geojson["coordinates"] for c in ring]
+                if ext_geojson["type"] == "MultiLineString"
+                else ext_geojson["coordinates"]
+            )
+            if len(ext_coords) >= 2:
+                ext_coords[0] = _offset_toward(ext_coords[0], ext_coords[1], 15)
+                coords = ext_coords + coords
+
+    if junc_end_id:
+        ext_row = await conn.fetchrow("""
+            WITH dijkstra AS (
+                SELECT path.edge
+                FROM pgr_dijkstra(
+                    'SELECT id, source, target, cost, reverse_cost FROM road_network WHERE cost > 0',
+                    $1::bigint, $2::bigint, directed := true
+                ) path
+                WHERE path.edge >= 0
+            )
+            SELECT ST_AsGeoJSON(ST_LineMerge(ST_Collect(rn.geom))) AS geojson
+            FROM dijkstra d
+            JOIN road_network rn ON rn.id = d.edge
+        """, end_node, junc_end_id)
+        if ext_row and ext_row["geojson"]:
+            ext_geojson = json.loads(ext_row["geojson"])
+            ext_coords = (
+                [c for ring in ext_geojson["coordinates"] for c in ring]
+                if ext_geojson["type"] == "MultiLineString"
+                else ext_geojson["coordinates"]
+            )
+            if len(ext_coords) >= 2:
+                ext_coords[-1] = _offset_toward(ext_coords[-1], ext_coords[-2], 15)
+                coords = coords + ext_coords
 
     return JSONResponse({"type": "LineString", "coordinates": coords})
 
