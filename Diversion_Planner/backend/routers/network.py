@@ -25,13 +25,17 @@ async def _find_outward_junction(
     conn: asyncpg.Connection,
     node_id: int,
     forward: bool,
+    closure_bearing: float,
     max_hops: int = 60,
 ) -> Optional[list]:
     """
     Walk along directed motorway edges from node_id, staying on the same carriageway.
     forward=False → walk backward (target→source) to find approach junction before start_node
     forward=True  → walk forward  (source→target) to find departure junction after end_node
-    Returns [lng, lat] of the first node found that connects to a slip/impacted road.
+    closure_bearing (degrees) filters each edge so only edges pointing in the closure
+    direction are followed — cos(diff) > 0.5 means within 60° of closure direction.
+    ST_Azimuth returns radians so we convert closure_bearing via RADIANS($3).
+    Returns (node_id, lng, lat) of the first junction node found.
     """
     if forward:
         walk_sql = """
@@ -39,11 +43,13 @@ async def _find_outward_junction(
                 SELECT DISTINCT rn.target, 1
                 FROM road_network rn
                 WHERE rn.source = $1 AND rn.road_type = 'motorway' AND rn.cost > 0
+                  AND cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
                 UNION ALL
                 SELECT DISTINCT rn.target, w.depth + 1
                 FROM walk w
                 JOIN road_network rn ON rn.source = w.node_id
                 WHERE rn.road_type = 'motorway' AND rn.cost > 0 AND w.depth < $2
+                  AND cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
             )
             SELECT w.node_id,
                 COALESCE(
@@ -58,7 +64,7 @@ async def _find_outward_junction(
             WHERE w.node_id != $1
               AND EXISTS (
                 SELECT 1 FROM road_network rn
-                WHERE (rn.source = w.node_id OR rn.target = w.node_id)
+                WHERE rn.target = w.node_id
                   AND rn.road_type IN ('motorway_link', 'trunk_link', 'trunk', 'primary', 'primary_link')
                   AND rn.cost > 0
               )
@@ -71,11 +77,13 @@ async def _find_outward_junction(
                 SELECT DISTINCT rn.source, 1
                 FROM road_network rn
                 WHERE rn.target = $1 AND rn.road_type = 'motorway' AND rn.cost > 0
+                  AND cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
                 UNION ALL
                 SELECT DISTINCT rn.source, w.depth + 1
                 FROM walk w
                 JOIN road_network rn ON rn.target = w.node_id
                 WHERE rn.road_type = 'motorway' AND rn.cost > 0 AND w.depth < $2
+                  AND cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
             )
             SELECT w.node_id,
                 COALESCE(
@@ -90,18 +98,25 @@ async def _find_outward_junction(
             WHERE w.node_id != $1
               AND EXISTS (
                 SELECT 1 FROM road_network rn
-                WHERE (rn.source = w.node_id OR rn.target = w.node_id)
+                WHERE rn.source = w.node_id
                   AND rn.road_type IN ('motorway_link', 'trunk_link', 'trunk', 'primary', 'primary_link')
                   AND rn.cost > 0
               )
             ORDER BY w.depth ASC
             LIMIT 1
         """
-    row = await conn.fetchrow(walk_sql, node_id, max_hops)
+    row = await conn.fetchrow(walk_sql, node_id, max_hops, closure_bearing)
     if row and row["lng"] is not None:
         print(f"[network] outward junction (forward={forward}) node={row['node_id']} → ({row['lng']:.4f},{row['lat']:.4f})")
         return (int(row["node_id"]), float(row["lng"]), float(row["lat"]))
     return None
+
+
+def _bearing(p1: list, p2: list) -> float:
+    """Compass bearing in degrees (0–360) from p1 to p2 ([lng, lat])."""
+    lng1, lat1 = p1; lng2, lat2 = p2
+    cos_lat = math.cos(math.radians((lat1 + lat2) / 2))
+    return math.degrees(math.atan2((lng2 - lng1) * cos_lat, lat2 - lat1)) % 360
 
 
 def _offset_toward(from_pt: list, toward_pt: list, distance_m: float) -> list:
@@ -149,19 +164,20 @@ async def preview_closure_line(start_node: int, end_node: int, conn: asyncpg.Con
     else:
         coords = geojson["coordinates"]
 
-    # Only extend if the endpoint is not already at a junction node.
-    # Walk along directed motorway edges (same carriageway only).
-    # Use pgr_dijkstra for the extension geometry so it follows actual road edges
-    # (not a straight line) — this keeps the extension on the correct carriageway.
+    # Bearing of the closure (degrees, 0-360). Used to filter the junction walk
+    # to same-carriageway edges only — cross-carriageway connectors tagged
+    # highway=motorway are ~90-180° off and will be excluded by cos(diff) > 0.5.
+    closure_bearing = _bearing(coords[0], coords[-1])
+
     junc_start_id = None
     if not await _node_has_impacted_road(conn, start_node):
-        result = await _find_outward_junction(conn, start_node, forward=False)
+        result = await _find_outward_junction(conn, start_node, forward=False, closure_bearing=closure_bearing)
         if result:
             junc_start_id = result[0]
 
     junc_end_id = None
     if not await _node_has_impacted_road(conn, end_node):
-        result = await _find_outward_junction(conn, end_node, forward=True)
+        result = await _find_outward_junction(conn, end_node, forward=True, closure_bearing=closure_bearing)
         if result:
             junc_end_id = result[0]
 

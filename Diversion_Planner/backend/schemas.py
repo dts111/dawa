@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List, Any
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 import uuid
 
 
@@ -68,7 +68,7 @@ class DiversionResponse(BaseModel):
 class RouteGenerateRequest(BaseModel):
     closure_id: uuid.UUID
     vehicle_type: str = "car"  # car|hgv
-    n_alternatives: int = 3
+    n_alternatives: int = Field(3, ge=1, le=3)
 
 
 class LibraryEntry(BaseModel):
@@ -104,3 +104,6 @@ class NearestNodeResponse(BaseModel):
     lng: float
     lat: float
     distance_m: float
+    road_name: Optional[str] = None
+    road_type: Optional[str] = None
+    is_junction: bool = False

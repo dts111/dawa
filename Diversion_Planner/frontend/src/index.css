@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .input {
+    @apply block w-full rounded border border-gray-300 px-2.5 py-1.5 text-sm shadow-sm
+           focus:border-nh-blue focus:outline-none focus:ring-1 focus:ring-nh-blue;
+  }
+  .label {
+    @apply block text-xs font-medium text-gray-600 mb-1;
+  }
+  .btn-primary {
+    @apply rounded bg-nh-blue px-4 py-2 text-sm font-semibold text-white
+           hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+  }
+  .btn-secondary {
+    @apply rounded border border-nh-blue px-4 py-2 text-sm font-semibold text-nh-blue
+           hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+  }
+}
+
+/* MapLibre controls styling */
+.maplibregl-ctrl-group {
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important;
+}

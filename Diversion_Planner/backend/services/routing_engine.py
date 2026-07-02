@@ -18,6 +18,8 @@ async def find_nearest_node(conn: asyncpg.Connection, lng: float, lat: float) ->
             SELECT source AS node_id,
                    ST_X(ST_StartPoint(geom)) AS lng,
                    ST_Y(ST_StartPoint(geom)) AS lat,
+                   name,
+                   road_type,
                    ST_Distance(
                        ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), 4326), 3857),
                        ST_Transform(ST_StartPoint(geom), 3857)
@@ -28,6 +30,8 @@ async def find_nearest_node(conn: asyncpg.Connection, lng: float, lat: float) ->
             SELECT target AS node_id,
                    ST_X(ST_EndPoint(geom)) AS lng,
                    ST_Y(ST_EndPoint(geom)) AS lat,
+                   name,
+                   road_type,
                    ST_Distance(
                        ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), 4326), 3857),
                        ST_Transform(ST_EndPoint(geom), 3857)
@@ -35,14 +39,23 @@ async def find_nearest_node(conn: asyncpg.Connection, lng: float, lat: float) ->
             FROM road_network
             WHERE cost > 0
         )
-        SELECT node_id, lng, lat, dist
+        SELECT node_id, lng, lat, name, road_type, dist
         FROM vertices
         ORDER BY dist
         LIMIT 1
     """, lng, lat)
     if not row:
         return None
-    return {"node_id": row["node_id"], "lng": row["lng"], "lat": row["lat"], "distance_m": row["dist"]}
+    is_junction = await _node_has_impacted_road(conn, row["node_id"])
+    return {
+        "node_id": row["node_id"],
+        "lng": row["lng"],
+        "lat": row["lat"],
+        "distance_m": row["dist"],
+        "road_name": row["name"],
+        "road_type": row["road_type"],
+        "is_junction": is_junction,
+    }
 
 
 async def _get_node_coords(conn: asyncpg.Connection, node_id: int) -> Optional[tuple[float, float]]:
@@ -78,6 +91,7 @@ async def _find_outward_junction(
     conn: asyncpg.Connection,
     node_id: int,
     forward: bool,
+    closure_bearing: float,
     max_hops: int = 60,
 ) -> Optional[tuple[int, float, float]]:
     """
@@ -85,6 +99,7 @@ async def _find_outward_junction(
     a slip/impacted road). Duplicated from routers/network.py to avoid circular import.
     forward=False → walk backward (find approach junction before start node)
     forward=True  → walk forward  (find departure junction after end node)
+    closure_bearing (degrees) filters to same-carriageway edges only via cos(diff) > 0.5.
     Returns (node_id, lng, lat) so the caller can query by exact node_id.
     """
     if forward:
@@ -93,11 +108,13 @@ async def _find_outward_junction(
                 SELECT DISTINCT rn.target, 1
                 FROM road_network rn
                 WHERE rn.source = $1 AND rn.road_type = 'motorway' AND rn.cost > 0
+                  AND cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
                 UNION ALL
                 SELECT DISTINCT rn.target, w.depth + 1
                 FROM walk w
                 JOIN road_network rn ON rn.source = w.node_id
                 WHERE rn.road_type = 'motorway' AND rn.cost > 0 AND w.depth < $2
+                  AND cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
             )
             SELECT w.node_id,
                 COALESCE(
@@ -125,11 +142,13 @@ async def _find_outward_junction(
                 SELECT DISTINCT rn.source, 1
                 FROM road_network rn
                 WHERE rn.target = $1 AND rn.road_type = 'motorway' AND rn.cost > 0
+                  AND cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
                 UNION ALL
                 SELECT DISTINCT rn.source, w.depth + 1
                 FROM walk w
                 JOIN road_network rn ON rn.target = w.node_id
                 WHERE rn.road_type = 'motorway' AND rn.cost > 0 AND w.depth < $2
+                  AND cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
             )
             SELECT w.node_id,
                 COALESCE(
@@ -151,10 +170,17 @@ async def _find_outward_junction(
             ORDER BY w.depth ASC
             LIMIT 1
         """
-    row = await conn.fetchrow(walk_sql, node_id, max_hops)
+    row = await conn.fetchrow(walk_sql, node_id, max_hops, closure_bearing)
     if row and row["lng"] is not None:
         return (int(row["node_id"]), float(row["lng"]), float(row["lat"]))
     return None
+
+
+def _bearing(p1: list, p2: list) -> float:
+    """Compass bearing in degrees (0–360) from p1 to p2 ([lng, lat])."""
+    lng1, lat1 = p1; lng2, lat2 = p2
+    cos_lat = math.cos(math.radians((lat1 + lat2) / 2))
+    return math.degrees(math.atan2((lng2 - lng1) * cos_lat, lat2 - lat1)) % 360
 
 
 def _avoid_polygon(closure_geojson: dict, buffer_m: float = 50) -> dict:
@@ -270,12 +296,14 @@ async def generate_routes(
     junc_end_coord:   list = list(end)
 
     try:
+        closure_bearing = _bearing(list(start), list(end))
+
         # Find junction nodes (same directed walk as red line extension)
         if await _node_has_impacted_road(conn, source_node):
             junc_start_id = source_node
             junc_start_coord = list(start)
         else:
-            j = await _find_outward_junction(conn, source_node, forward=False)
+            j = await _find_outward_junction(conn, source_node, forward=False, closure_bearing=closure_bearing)
             if j:
                 junc_start_id, junc_start_coord = j[0], [j[1], j[2]]
             else:
@@ -285,7 +313,7 @@ async def generate_routes(
             junc_end_id = target_node
             junc_end_coord = list(end)
         else:
-            j = await _find_outward_junction(conn, target_node, forward=True)
+            j = await _find_outward_junction(conn, target_node, forward=True, closure_bearing=closure_bearing)
             if j:
                 junc_end_id, junc_end_coord = j[0], [j[1], j[2]]
             else:
