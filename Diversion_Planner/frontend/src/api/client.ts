@@ -16,7 +16,7 @@ export const getClosure = (id: string) =>
 export const deleteClosure = (id: string) =>
   api.delete(`/closures/${id}`)
 
-export const findNearestNode = (lng: number, lat: number) =>
+export const findNearestNode = (lng: number, lat: number, bearing?: number) =>
   api.get<{
     node_id: number
     lng: number
@@ -27,7 +27,7 @@ export const findNearestNode = (lng: number, lat: number) =>
     is_junction: boolean
   }>(
     '/closures/nearest-node/find',
-    { params: { lng, lat } }
+    { params: { lng, lat, ...(bearing !== undefined ? { bearing } : {}) } }
   ).then(r => r.data)
 
 // Routes

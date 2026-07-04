@@ -33,3 +33,40 @@ export const M25_JUNCTIONS = [
   { id: 'J30', name: 'South Ockendon', lat: 51.497786, lon: 0.2681 },
   { id: 'J31', name: 'A1306 Lakeside', lat: 51.486999, lon: 0.2662 },
 ]
+
+const RING_CENTROID_LAT = M25_JUNCTIONS.reduce((s, j) => s + j.lat, 0) / M25_JUNCTIONS.length
+const RING_CENTROID_LON = M25_JUNCTIONS.reduce((s, j) => s + j.lon, 0) / M25_JUNCTIONS.length
+
+// Compass bearing (0-360, N=0/E=90/S=180/W=270) from the ring's centroid to a
+// point — junction numbers increase monotonically with this bearing all the
+// way around the M25, so comparing two junctions' bearings tells us which
+// carriageway (CW/ACW) a start→end pick actually travels on.
+function bearingFromRingCentroid(lat: number, lon: number): number {
+  const dLat = lat - RING_CENTROID_LAT
+  const dLon = (lon - RING_CENTROID_LON) * Math.cos((Math.PI / 180) * RING_CENTROID_LAT)
+  const deg = (Math.atan2(dLon, dLat) * 180) / Math.PI
+  return (deg + 360) % 360
+}
+
+// Infer the closure direction from the order two M25 junctions were picked.
+// Returns null if either id isn't a known M25 junction, or they're the same.
+export function inferDirection(startJunctionId: string, endJunctionId: string): 'CW' | 'ACW' | null {
+  const start = M25_JUNCTIONS.find(j => j.id === startJunctionId)
+  const end = M25_JUNCTIONS.find(j => j.id === endJunctionId)
+  if (!start || !end || start.id === end.id) return null
+  const startBearing = bearingFromRingCentroid(start.lat, start.lon)
+  const endBearing = bearingFromRingCentroid(end.lat, end.lon)
+  const diff = ((endBearing - startBearing) % 360 + 360) % 360
+  return diff < 180 ? 'CW' : 'ACW'
+}
+
+// Direct point-to-point compass bearing from p1 to p2 (mirrors the backend's
+// _bearing() helper in routing_engine.py) — this is the actual travel
+// direction between two junctions, used to disambiguate which carriageway's
+// node to snap to (distinct from bearingFromRingCentroid, which is each
+// point's position relative to the ring, used only for CW/ACW classification).
+export function bearingBetween(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const cosLat = Math.cos((Math.PI / 180) * ((lat1 + lat2) / 2))
+  const deg = (Math.atan2((lon2 - lon1) * cosLat, lat2 - lat1) * 180) / Math.PI
+  return (deg + 360) % 360
+}

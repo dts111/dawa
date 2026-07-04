@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createClosure, generateRoutes } from '../api/client'
+import { M25_JUNCTIONS, inferDirection } from '../junctions'
 import type { Closure, Diversion, ImpactedRoad } from '../types'
 
 interface Props {
@@ -16,9 +17,10 @@ interface Props {
   previewLine: GeoJSON.LineString | null
   direction: string
   onDirectionChange: (direction: string) => void
+  onPickJunction: (which: 'start' | 'end', pickedId: string, otherId: string) => void
 }
 
-export default function ClosurePanel({ onClosureCreated, onPickStart, onPickEnd, onClear, pickedStart, pickedEnd, pickError, impactedRoads, selectedImpactedIds, onToggleImpacted, previewLine, direction, onDirectionChange }: Props) {
+export default function ClosurePanel({ onClosureCreated, onPickStart, onPickEnd, onClear, pickedStart, pickedEnd, pickError, impactedRoads, selectedImpactedIds, onToggleImpacted, previewLine, direction, onDirectionChange, onPickJunction }: Props) {
   const [form, setForm] = useState({
     closure_type: 'mainline',
     start_junction: '',
@@ -187,11 +189,39 @@ export default function ClosurePanel({ onClosureCreated, onPickStart, onPickEnd,
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="label">Start Junction</span>
-              <input className="input" value={form.start_junction} onChange={e => set('start_junction', e.target.value)} placeholder="e.g. J10" />
+              <select
+                className="input"
+                value={form.start_junction}
+                onChange={e => {
+                  set('start_junction', e.target.value)
+                  if (e.target.value) onPickJunction('start', e.target.value, form.end_junction)
+                  const inferred = inferDirection(e.target.value, form.end_junction)
+                  if (inferred) onDirectionChange(inferred)
+                }}
+              >
+                <option value="">— Select junction —</option>
+                {M25_JUNCTIONS.map(j => (
+                  <option key={j.id} value={j.id}>{j.id} – {j.name}</option>
+                ))}
+              </select>
             </label>
             <label className="block">
               <span className="label">End Junction</span>
-              <input className="input" value={form.end_junction} onChange={e => set('end_junction', e.target.value)} placeholder="e.g. J11" />
+              <select
+                className="input"
+                value={form.end_junction}
+                onChange={e => {
+                  set('end_junction', e.target.value)
+                  if (e.target.value) onPickJunction('end', e.target.value, form.start_junction)
+                  const inferred = inferDirection(form.start_junction, e.target.value)
+                  if (inferred) onDirectionChange(inferred)
+                }}
+              >
+                <option value="">— Select junction —</option>
+                {M25_JUNCTIONS.map(j => (
+                  <option key={j.id} value={j.id}>{j.id} – {j.name}</option>
+                ))}
+              </select>
             </label>
             <label className="block">
               <span className="label">Start Chainage</span>

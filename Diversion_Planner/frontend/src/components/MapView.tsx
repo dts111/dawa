@@ -3,6 +3,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { Closure, Diversion } from '../types'
 import { M25_JUNCTIONS } from '../junctions'
+import { snapToTrack, type GeoJSONData } from '../geo'
 
 type PickedNode = {
   node_id: number
@@ -60,24 +61,6 @@ const SATELLITE_STYLE: maplibregl.StyleSpecification = {
   layers: [{ id: 'esri-satellite', type: 'raster', source: 'esri-satellite' }],
 }
 
-type GeoJSONData = GeoJSON.FeatureCollection | null
-
-function snapToTrack(lat: number, lon: number, track: GeoJSONData): [number, number] {
-  if (!track) return [lon, lat]
-  let bestDist = Infinity
-  let bestLng = lon, bestLat = lat
-  for (const feature of track.features) {
-    const geom = feature.geometry as GeoJSON.LineString | GeoJSON.MultiLineString
-    const rings = geom.type === 'LineString' ? [geom.coordinates] : geom.coordinates
-    for (const coords of rings) {
-      for (const [lng, lt] of coords) {
-        const d = Math.hypot(lng - lon, lt - lat)
-        if (d < bestDist) { bestDist = d; bestLng = lng; bestLat = lt }
-      }
-    }
-  }
-  return [bestLng, bestLat]
-}
 
 export default function MapView({ closure, routes, selectedRouteRank, onMapClick, pickingMode, pickedStart, pickedEnd, previewLine, impactedFeatures, direction }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)

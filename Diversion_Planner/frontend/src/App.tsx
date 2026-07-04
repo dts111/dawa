@@ -6,6 +6,8 @@ import AssessmentPanel from './components/AssessmentPanel'
 import ExportPanel from './components/ExportPanel'
 import LibraryPanel from './components/LibraryPanel'
 import { findNearestNode, previewClosureLine, getImpactedRoads } from './api/client'
+import { snapToTrack, type GeoJSONData } from './geo'
+import { M25_JUNCTIONS, bearingBetween } from './junctions'
 import type { Closure, Diversion, Panel, ImpactedRoad } from './types'
 
 const NAV: { id: Panel; label: string }[] = [
@@ -39,6 +41,10 @@ export default function App() {
   const [selectedImpactedIds, setSelectedImpactedIds] = useState<number[]>([])
   const [impactedClosures, setImpactedClosures] = useState<Closure[]>([])
   const [direction, setDirection] = useState('CW')
+  const [m25Track, setM25Track] = useState<GeoJSONData>(null)
+  useEffect(() => {
+    fetch('/m25_track.json').then(r => r.json()).then(setM25Track).catch(console.error)
+  }, [])
   useEffect(() => {
     if (!pickedStart || !pickedEnd) {
       setPreviewLine(null)
@@ -101,6 +107,55 @@ export default function App() {
       }
     }
   }, [pickingMode])
+
+  const handleJunctionPick = useCallback(async (which: 'start' | 'end', pickedId: string, otherId: string) => {
+    const picked = M25_JUNCTIONS.find(j => j.id === pickedId)
+    if (!picked) return
+    setPickError(null)
+
+    const resolveOne = async (target: 'start' | 'end', lat: number, lon: number, bearing?: number) => {
+      // Junction coordinates in junctions.ts are approximate interchange centers,
+      // not exact points on the carriageway — snap onto the M25 track first so we
+      // pick a node actually on the M25, not a nearby slip road or A-road. The
+      // bearing (when known) further disambiguates the CW/ACW carriageway, since
+      // they run close enough together that distance alone isn't reliable.
+      const [snapLng, snapLat] = snapToTrack(lat, lon, m25Track)
+      const node = await findNearestNode(snapLng, snapLat, bearing)
+      const result: PickedNode = {
+        node_id: node.node_id,
+        lng: snapLng,
+        lat: snapLat,
+        road_name: node.road_name,
+        road_type: node.road_type,
+        is_junction: node.is_junction,
+      }
+      if (target === 'start') setPickedStart(result)
+      else setPickedEnd(result)
+    }
+
+    try {
+      const other = M25_JUNCTIONS.find(j => j.id === otherId)
+      if (other) {
+        // Both junctions now known — compute the actual travel bearing between
+        // them and re-resolve BOTH points with it, since whichever was picked
+        // first had no bearing hint yet and may have landed on the wrong carriageway.
+        const startJ = which === 'start' ? picked : other
+        const endJ = which === 'start' ? other : picked
+        const bearing = bearingBetween(startJ.lat, startJ.lon, endJ.lat, endJ.lon)
+        await resolveOne('start', startJ.lat, startJ.lon, bearing)
+        await resolveOne('end', endJ.lat, endJ.lon, bearing)
+      } else {
+        await resolveOne(which, picked.lat, picked.lon)
+      }
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status
+      if (status === 404) {
+        setPickError('No road network loaded. Run the OSM import first: docker compose exec backend python scripts/import_osm.py')
+      } else {
+        setPickError('Failed to find nearest node — check the backend is running.')
+      }
+    }
+  }, [m25Track])
 
   const handleClosureCreated = (closure: Closure, newRoutes: Diversion[], newImpactedClosures: Closure[]) => {
     const closureForMap: Closure = previewLine ? { ...closure, geom_geojson: previewLine as Closure['geom_geojson'] } : closure
@@ -170,6 +225,7 @@ export default function App() {
                 previewLine={previewLine}
                 direction={direction}
                 onDirectionChange={setDirection}
+                onPickJunction={handleJunctionPick}
               />
             )}
             {panel === 'routes' && (

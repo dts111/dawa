@@ -11,8 +11,18 @@ ORS_URL = "https://api.openrouteservice.org/v2/directions/{profile}/geojson"
 ORS_KEY = os.getenv("ORS_API_KEY", "")
 
 
-async def find_nearest_node(conn: asyncpg.Connection, lng: float, lat: float) -> Optional[dict]:
-    """Return the road network vertex (source/target) closest to the given point."""
+async def find_nearest_node(
+    conn: asyncpg.Connection, lng: float, lat: float, bearing: Optional[float] = None
+) -> Optional[dict]:
+    """Return the road network vertex (source/target) closest to the given point.
+
+    `bearing` (compass degrees, optional) disambiguates dual carriageways that run
+    close together (e.g. the M25's CW/ACW carriageways can be ~50m apart) — without
+    it, nearest-vertex search can trivially snap onto the wrong-direction carriageway.
+    When given, vertices whose edge travels in roughly that direction are preferred
+    over closer vertices on a wrong-direction edge; same threshold/pattern as
+    _find_outward_junction's carriageway filter below.
+    """
     row = await conn.fetchrow("""
         WITH vertices AS (
             SELECT source AS node_id,
@@ -20,6 +30,7 @@ async def find_nearest_node(conn: asyncpg.Connection, lng: float, lat: float) ->
                    ST_Y(ST_StartPoint(geom)) AS lat,
                    name,
                    road_type,
+                   ST_Azimuth(ST_StartPoint(geom), ST_EndPoint(geom)) AS edge_bearing,
                    ST_Distance(
                        ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), 4326), 3857),
                        ST_Transform(ST_StartPoint(geom), 3857)
@@ -32,6 +43,7 @@ async def find_nearest_node(conn: asyncpg.Connection, lng: float, lat: float) ->
                    ST_Y(ST_EndPoint(geom)) AS lat,
                    name,
                    road_type,
+                   ST_Azimuth(ST_StartPoint(geom), ST_EndPoint(geom)) AS edge_bearing,
                    ST_Distance(
                        ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), 4326), 3857),
                        ST_Transform(ST_EndPoint(geom), 3857)
@@ -41,9 +53,13 @@ async def find_nearest_node(conn: asyncpg.Connection, lng: float, lat: float) ->
         )
         SELECT node_id, lng, lat, name, road_type, dist
         FROM vertices
-        ORDER BY dist
+        ORDER BY
+            CASE WHEN $3::float8 IS NULL THEN 0
+                 WHEN cos(edge_bearing - RADIANS($3::float8)) > 0.5 THEN 0
+                 ELSE 1 END,
+            dist
         LIMIT 1
-    """, lng, lat)
+    """, lng, lat, bearing)
     if not row:
         return None
     is_junction = await _node_has_impacted_road(conn, row["node_id"])

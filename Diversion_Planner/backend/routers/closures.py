@@ -48,8 +48,8 @@ async def list_closures(session: AsyncSession = Depends(get_session)):
 
 
 @router.get("/nearest-node/find", response_model=NearestNodeResponse)
-async def nearest_node(lng: float, lat: float, conn=Depends(get_raw_conn)):
-    node = await find_nearest_node(conn, lng, lat)
+async def nearest_node(lng: float, lat: float, bearing: float | None = None, conn=Depends(get_raw_conn)):
+    node = await find_nearest_node(conn, lng, lat, bearing)
     if not node:
         raise HTTPException(status_code=404, detail="No road network nodes found. Import OSM data first.")
     return node
