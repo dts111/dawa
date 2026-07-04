@@ -8,6 +8,7 @@ from database import get_session, get_raw_conn
 from models import Closure, Diversion, DiversionLibrary
 from schemas import RouteGenerateRequest, DiversionResponse
 from services.routing_engine import generate_routes
+from services.routing_pgr import generate_routes_pgr
 from services.assessment import score_route
 
 router = APIRouter()
@@ -36,14 +37,24 @@ async def generate_diversion_routes(
         except Exception:
             pass
 
-    raw_routes = await generate_routes(
-        conn,
-        closure.start_node,
-        closure.end_node,
-        body.vehicle_type,
-        body.n_alternatives,
-        closure_geojson=closure_geojson,
-    )
+    if body.engine == "pgr":
+        raw_routes = await generate_routes_pgr(
+            conn,
+            closure.start_node,
+            closure.end_node,
+            body.vehicle_type,
+            body.n_alternatives,
+            closure_geojson=closure_geojson,
+        )
+    else:
+        raw_routes = await generate_routes(
+            conn,
+            closure.start_node,
+            closure.end_node,
+            body.vehicle_type,
+            body.n_alternatives,
+            closure_geojson=closure_geojson,
+        )
     if not raw_routes:
         raise HTTPException(status_code=422, detail="No routes found. Check that road network is loaded and nodes are connected.")
 

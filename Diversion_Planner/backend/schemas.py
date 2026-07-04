@@ -69,6 +69,7 @@ class RouteGenerateRequest(BaseModel):
     closure_id: uuid.UUID
     vehicle_type: str = "car"  # car|hgv
     n_alternatives: int = Field(3, ge=1, le=3)
+    engine: str = "ors"  # ors (OpenRouteService) | pgr (pgRouting on DBFO network)
 
 
 class LibraryEntry(BaseModel):
