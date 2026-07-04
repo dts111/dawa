@@ -83,11 +83,16 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const [satellite, setSatellite] = useState(true)
-  const [layers, setLayers] = useState({ m25: true, aroads: true, motorways: true, links: true, junctions: true })
-  const layersRef = useRef({ m25: true, aroads: true, motorways: true, links: true, junctions: true })
+  const [layers, setLayers] = useState({ m25: true, aroads: true, motorways: true, links: true, junctions: true, diversions: true, closure: true, impacted: true })
+  const layersRef = useRef({ m25: true, aroads: true, motorways: true, links: true, junctions: true, diversions: true, closure: true, impacted: true })
   layersRef.current = layers
   const onMapClickRef = useRef(onMapClick)
   onMapClickRef.current = onMapClick
+  const [zoomBoxMode, setZoomBoxMode] = useState(false)
+  const zoomBoxModeRef = useRef(false)
+  zoomBoxModeRef.current = zoomBoxMode
+  const zoomBoxStartRef = useRef<{ x: number; y: number } | null>(null)
+  const zoomBoxElRef = useRef<HTMLDivElement | null>(null)
   const junctionMarkersRef = useRef<maplibregl.Marker[]>([])
   const startMarkerRef = useRef<maplibregl.Marker | null>(null)
   const endMarkerRef = useRef<maplibregl.Marker | null>(null)
@@ -271,8 +276,8 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
     // A-road routes share the same extended ORS points — grab from route 1 (or first available)
     const aroadRoute = routes.find(r => !r.route_attributes?.motorway_bypass)
     if (aroadRoute?.route_attributes?.ors_origin && aroadRoute?.route_attributes?.ors_destination) {
-      orsMarkersRef.current.push(makeMarker(aroadRoute.route_attributes.ors_origin, '⬤ ORS start', '#7c3aed'))
-      orsMarkersRef.current.push(makeMarker(aroadRoute.route_attributes.ors_destination, '⬤ ORS end', '#7c3aed'))
+      orsMarkersRef.current.push(makeMarker(aroadRoute.route_attributes.ors_origin, '⬤ Div start', '#7c3aed'))
+      orsMarkersRef.current.push(makeMarker(aroadRoute.route_attributes.ors_destination, '⬤ Div end', '#7c3aed'))
     }
   }, [routes])
 
@@ -304,7 +309,7 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
     const prev = prevRoutesLenRef.current
     prevRoutesLenRef.current = routes.length
     if (prev === 0 && routes.length > 0) {
-      setLayers({ m25: false, aroads: false, motorways: false, links: false, junctions: true })
+      setLayers({ m25: false, aroads: false, motorways: false, links: false, junctions: true, diversions: true, closure: true, impacted: true })
       setSatellite(false)
     }
   }, [routes])
@@ -312,7 +317,7 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
   // Turn all DBFO network layers back on when the closure is cleared
   useEffect(() => {
     if (!closure) {
-      setLayers({ m25: true, aroads: true, motorways: true, links: true, junctions: true })
+      setLayers({ m25: true, aroads: true, motorways: true, links: true, junctions: true, diversions: true, closure: true, impacted: true })
     }
   }, [closure])
 
@@ -322,6 +327,11 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
     ;['a217-casing', 'a217-line'].forEach(id => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', vis(lyr.aroads)))
     ;['motorways-casing', 'motorways-line'].forEach(id => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', vis(lyr.motorways)))
     ;['links-casing', 'links-line'].forEach(id => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', vis(lyr.links)))
+    ;['closure-casing', 'closure-line'].forEach(id => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', vis(lyr.closure)))
+    ;['impacted-casing', 'impacted-line'].forEach(id => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', vis(lyr.impacted)))
+    for (const rank of [1, 2, 3]) {
+      ;[`route-${rank}-line`, `route-${rank}-arrows`].forEach(id => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', vis(lyr.diversions)))
+    }
   }
 
   // Layer visibility toggles
@@ -395,8 +405,50 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left')
     map.on('load', () => { addCustomLayers(map); addJunctionMarkers(map) })
     map.on('click', e => {
+      if (zoomBoxModeRef.current) return
       onMapClickRef.current(e.lngLat.lng, e.lngLat.lat)
     })
+
+    // Zoom-to-area: click-drag a box (no Shift key needed) to zoom into it
+    map.on('mousedown', e => {
+      if (!zoomBoxModeRef.current) return
+      e.preventDefault()
+      map.dragPan.disable()
+      zoomBoxStartRef.current = { x: e.point.x, y: e.point.y }
+      const el = document.createElement('div')
+      el.style.cssText = 'position:absolute;border:2px dashed #2563eb;background:rgba(37,99,235,0.15);pointer-events:none;z-index:30;'
+      map.getContainer().appendChild(el)
+      zoomBoxElRef.current = el
+    })
+    map.on('mousemove', e => {
+      const start = zoomBoxStartRef.current
+      const el = zoomBoxElRef.current
+      if (!start || !el) return
+      const x = Math.min(start.x, e.point.x)
+      const y = Math.min(start.y, e.point.y)
+      const w = Math.abs(e.point.x - start.x)
+      const h = Math.abs(e.point.y - start.y)
+      el.style.left = `${x}px`
+      el.style.top = `${y}px`
+      el.style.width = `${w}px`
+      el.style.height = `${h}px`
+    })
+    map.on('mouseup', e => {
+      const start = zoomBoxStartRef.current
+      if (!start) return
+      zoomBoxElRef.current?.remove()
+      zoomBoxElRef.current = null
+      zoomBoxStartRef.current = null
+      map.dragPan.enable()
+      const dx = Math.abs(e.point.x - start.x)
+      const dy = Math.abs(e.point.y - start.y)
+      if (dx > 5 && dy > 5) {
+        const startLngLat = map.unproject([start.x, start.y])
+        map.fitBounds([startLngLat, e.lngLat], { padding: 40 })
+      }
+      setZoomBoxMode(false)
+    })
+
     mapRef.current = map
     return () => { map.remove(); mapRef.current = null }
   }, [])
@@ -425,8 +477,8 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    map.getCanvas().style.cursor = pickingMode ? 'crosshair' : 'grab'
-  }, [pickingMode])
+    map.getCanvas().style.cursor = zoomBoxMode ? 'crosshair' : pickingMode ? 'crosshair' : 'grab'
+  }, [pickingMode, zoomBoxMode])
 
   // Update closure/routes — skip isStyleLoaded() guard: GeoJSON setData works
   // whenever the source exists; tiles may still be loading without blocking us.
@@ -479,6 +531,15 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
           {satellite ? 'Map' : 'Satellite'}
         </button>
 
+        <button
+          onClick={() => setZoomBoxMode(z => !z)}
+          className={`px-3 py-1.5 rounded shadow text-xs font-semibold border transition-colors ${
+            zoomBoxMode ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700' : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-100'
+          }`}
+        >
+          {zoomBoxMode ? 'Drag to zoom…' : 'Zoom to area'}
+        </button>
+
         {/* Layer toggles */}
         <div className="bg-white/95 rounded shadow border border-gray-200 p-2 text-xs space-y-1">
           <p className="font-semibold text-gray-600 uppercase tracking-wide mb-1">DBFO Network</p>
@@ -506,11 +567,20 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
 
       {/* Legend */}
       <div className="absolute bottom-8 right-3 bg-white/90 rounded shadow p-2 text-xs space-y-1 z-10">
-        <div className="flex items-center gap-2"><span className="w-6 inline-block rounded" style={{ height: 4, background: '#dc2626' }} />Closure</div>
-        <div className="flex items-center gap-2"><span className="w-6 inline-block border-t-2 border-dashed" style={{ borderColor: '#f97316' }} />Impacted roads</div>
-        <div className="flex items-center gap-2"><span className="w-6 inline-block rounded" style={{ height: 4, background: '#16a34a' }} />Primary diversion</div>
-        <div className="flex items-center gap-2"><span className="w-6 inline-block rounded" style={{ height: 4, background: '#2563eb' }} />Alt diversion 1</div>
-        <div className="flex items-center gap-2"><span className="w-6 inline-block rounded" style={{ height: 4, background: '#eab308' }} />Alt diversion 2</div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={layers.closure} onChange={() => toggleLayer('closure')} className="rounded" />
+          <span className="w-6 inline-block rounded" style={{ height: 4, background: '#dc2626' }} />Closure
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={layers.impacted} onChange={() => toggleLayer('impacted')} className="rounded" />
+          <span className="w-6 inline-block border-t-2 border-dashed" style={{ borderColor: '#f97316' }} />Impacted roads
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={layers.diversions} onChange={() => toggleLayer('diversions')} className="rounded" />
+          <span className="w-6 inline-block rounded" style={{ height: 4, background: '#16a34a' }} />Primary diversion
+        </label>
+        <div className="flex items-center gap-2 pl-5"><span className="w-6 inline-block rounded" style={{ height: 4, background: '#2563eb' }} />Alt diversion 1</div>
+        <div className="flex items-center gap-2 pl-5"><span className="w-6 inline-block rounded" style={{ height: 4, background: '#eab308' }} />Alt diversion 2</div>
       </div>
     </div>
   )

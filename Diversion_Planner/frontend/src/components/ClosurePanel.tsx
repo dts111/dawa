@@ -29,7 +29,7 @@ export default function ClosurePanel({ onClosureCreated, onPickStart, onPickEnd,
     date_to: '',
     reason: '',
     vehicle_type: 'car',
-    engine: 'ors',
+    engine: 'pgr',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -208,8 +208,8 @@ export default function ClosurePanel({ onClosureCreated, onPickStart, onPickEnd,
       <label className="block">
         <span className="label">Routing Engine</span>
         <select className="input" value={form.engine} onChange={e => set('engine', e.target.value)}>
-          <option value="ors">OpenRouteService (external)</option>
           <option value="pgr">DBFO Network (pgRouting)</option>
+          <option value="ors">OpenRouteService (external)</option>
         </select>
       </label>
 
