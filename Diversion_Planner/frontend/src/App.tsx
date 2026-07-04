@@ -178,6 +178,7 @@ export default function App() {
                 selectedRouteRank={selectedRouteRank}
                 onSelectRoute={setSelectedRouteRank}
                 closureId={activeClosure?.id ?? null}
+                direction={direction}
               />
             )}
             {panel === 'assessment' && (

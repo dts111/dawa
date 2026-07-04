@@ -31,6 +31,7 @@ export interface ScoreBreakdown {
 
 export interface RouteAttributes {
   named_roads: string[]
+  road_sequence?: { name: string; road_type: string; start_coord: [number, number] }[]
   road_type_m: Record<string, number>
   speed_range: { min: number; max: number } | null
   ors_origin?: [number, number]

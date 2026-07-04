@@ -237,6 +237,7 @@ async def generate_routes_pgr(
         # stored direction (two-way roads used via reverse_cost)
         coords: list[list[float]] = []
         named_roads: list[str] = []
+        road_sequence: list[dict] = []
         road_type_m: dict[str, float] = {}
         speeds: list[int] = []
         non_hgv = 0
@@ -250,6 +251,8 @@ async def generate_routes_pgr(
             name = (row["name"] or "").strip()
             if name and name not in named_roads:
                 named_roads.append(name)
+            if name and (not road_sequence or road_sequence[-1]["name"] != name):
+                road_sequence.append({"name": name, "road_type": row["road_type"], "start_coord": seg[0]})
             road_type_m[row["road_type"]] = road_type_m.get(row["road_type"], 0.0) + (row["length_m"] or 0.0)
             if row["speed_limit"]:
                 speeds.append(row["speed_limit"])
@@ -271,6 +274,7 @@ async def generate_routes_pgr(
             "route_attributes": {
                 "engine": "pgr",
                 "named_roads": named_roads[:15],
+                "road_sequence": road_sequence[:30],
                 "road_type_m": {kk: round(vv, 1) for kk, vv in road_type_m.items()},
                 "speed_range": {"min": min(speeds), "max": max(speeds)} if speeds else None,
                 "ors_origin": list(junc_start_coord),

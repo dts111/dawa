@@ -7,6 +7,7 @@ interface Props {
   selectedRouteRank: number | null
   onSelectRoute: (rank: number | null) => void
   closureId: string | null
+  direction: string
 }
 
 const RANK_LABELS: Record<number, string> = { 1: 'Primary', 2: 'Alt 1', 3: 'Alt 2' }
@@ -30,7 +31,98 @@ const ROAD_TYPE_LABELS: Record<string, string> = {
   secondary: 'Secondary', secondary_link: 'Secondary link',
 }
 
-function RouteAttributesDisplay({ attrs }: { attrs: RouteAttributes }) {
+// Road class hierarchy for classifying a slip road as an "exit" (leaving a
+// bigger road) or "entry" (joining one) — link variants inherit their base
+// class's rank so a motorway_link compares the same as a motorway neighbour.
+const ROAD_CLASS_RANK: Record<string, number> = {
+  motorway: 4, motorway_link: 4,
+  trunk: 3, trunk_link: 3,
+  primary: 2, primary_link: 2,
+  secondary: 1, secondary_link: 1,
+}
+const isLinkType = (type: string) => type.endsWith('_link')
+const GENERIC_LINK_NAMES = new Set(Object.values(ROAD_TYPE_LABELS))
+const SLIP_VERBS = ['taking', 'then', 'switching to', 'then']
+
+// Compass bearing in degrees (0-360) from p1 to p2 — mirrors the backend's
+// _bearing() helper (routing_engine.py) so segment directions read the same
+// way as the geodesy used for routing itself.
+function bearing(p1: [number, number], p2: [number, number]): number {
+  const [lng1, lat1] = p1
+  const [lng2, lat2] = p2
+  const cosLat = Math.cos((Math.PI / 180) * ((lat1 + lat2) / 2))
+  const deg = (Math.atan2((lng2 - lng1) * cosLat, lat2 - lat1) * 180) / Math.PI
+  return (deg + 360) % 360
+}
+
+function bearingToCompass(deg: number): string {
+  if (deg >= 315 || deg < 45) return 'northbound'
+  if (deg < 135) return 'eastbound'
+  if (deg < 225) return 'southbound'
+  return 'westbound'
+}
+
+function describeRoute(attrs: RouteAttributes, distKm: string, time: number, direction: string): string {
+  const seq = attrs.road_sequence
+
+  let routingText: string
+  if (seq && seq.length > 0) {
+    const parts: string[] = []
+    let slipCount = 0
+    seq.forEach((entry, i) => {
+      const prev = seq[i - 1]
+      const next = seq[i + 1]
+
+      let dirSuffix = ''
+      if (prev) {
+        if (entry.name.includes('M25') && (direction === 'CW' || direction === 'ACW')) {
+          dirSuffix = ` (${direction === 'CW' ? 'clockwise' : 'anticlockwise'})`
+        } else {
+          dirSuffix = ` (${bearingToCompass(bearing(prev.start_coord, entry.start_coord))})`
+        }
+      }
+
+      if (isLinkType(entry.road_type)) {
+        const thisRank = ROAD_CLASS_RANK[entry.road_type] ?? 0
+        const prevRank = prev ? (ROAD_CLASS_RANK[prev.road_type] ?? 0) : 0
+        const nextRank = next ? (ROAD_CLASS_RANK[next.road_type] ?? 0) : 0
+        const kind = nextRank > thisRank ? 'entry' : prevRank > thisRank ? 'exit' : null
+        const verb = i === 0 ? 'via' : SLIP_VERBS[Math.min(slipCount, SLIP_VERBS.length - 1)]
+        slipCount++
+        parts.push(kind ? `${verb} ${entry.name} ${kind} slip${dirSuffix}` : `${verb} ${entry.name}${dirSuffix}`)
+      } else if (GENERIC_LINK_NAMES.has(entry.name)) {
+        // Placeholder link name (no real road name) — describe as rejoining that road class
+        parts.push(`${i === 0 ? 'via' : 'onto'} ${entry.name}${dirSuffix}`)
+      } else {
+        // A real named road or junction/roundabout
+        parts.push(`${i === 0 ? 'via' : 'at'} ${entry.name}${dirSuffix}`)
+      }
+    })
+    routingText = `, routing ${parts.join(', ')}`
+  } else {
+    const roads = attrs.named_roads.slice(0, 6)
+    routingText = roads.length > 0 ? `, routing via ${roads.join(', ')}` : ''
+  }
+
+  let sentence = `This diversion covers ${distKm} km in approximately ${time} min${routingText}.`
+
+  const totalM = Object.values(attrs.road_type_m).reduce((s, v) => s + v, 0)
+  const byShare = Object.entries(attrs.road_type_m).sort((a, b) => b[1] - a[1])
+  const primaryType = byShare[0] ? (ROAD_TYPE_LABELS[byShare[0][0]] ?? byShare[0][0]) : null
+  const minorTypes = byShare.slice(1)
+    .filter(([, m]) => totalM > 0 && m / totalM >= 0.02)
+    .map(([type, m]) => `${ROAD_TYPE_LABELS[type] ?? type} (${(m / 1000).toFixed(1)} km)`)
+
+  if (primaryType) {
+    sentence += ` It runs primarily on ${primaryType}`
+    if (minorTypes.length > 0) sentence += `, with sections of ${minorTypes.join(', ')}`
+    sentence += '.'
+  }
+
+  return sentence
+}
+
+function RouteAttributesDisplay({ attrs, distKm, time, direction }: { attrs: RouteAttributes; distKm: string; time: number; direction: string }) {
   const totalM = Object.values(attrs.road_type_m).reduce((s, v) => s + v, 0)
   const segments = Object.entries(attrs.road_type_m)
     .sort((a, b) => b[1] - a[1])
@@ -38,6 +130,9 @@ function RouteAttributesDisplay({ attrs }: { attrs: RouteAttributes }) {
 
   return (
     <div className="mt-3 space-y-2 border-t border-gray-200 pt-2">
+      {/* Written diversion description */}
+      <p className="text-xs text-gray-600 leading-relaxed">{describeRoute(attrs, distKm, time, direction)}</p>
+
       {/* Road names */}
       {attrs.named_roads.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -85,7 +180,7 @@ function RouteAttributesDisplay({ attrs }: { attrs: RouteAttributes }) {
   )
 }
 
-export default function RoutePanel({ routes, selectedRouteRank, onSelectRoute, closureId }: Props) {
+export default function RoutePanel({ routes, selectedRouteRank, onSelectRoute, closureId, direction }: Props) {
   const [approving, setApproving] = useState<string | null>(null)
   const [approverName, setApproverName] = useState('')
   const [libraryEntries, setLibraryEntries] = useState<LibraryEntry[]>([])
@@ -160,7 +255,7 @@ export default function RoutePanel({ routes, selectedRouteRank, onSelectRoute, c
             </div>
 
             {route.route_attributes && (
-              <RouteAttributesDisplay attrs={route.route_attributes} />
+              <RouteAttributesDisplay attrs={route.route_attributes} distKm={distKm} time={time} direction={direction} />
             )}
 
             {isSelected && route.score_breakdown && (
