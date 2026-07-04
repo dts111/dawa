@@ -216,7 +216,7 @@ export default function ClosurePanel({ onClosureCreated, onPickStart, onPickEnd,
       {error && <p className="text-red-600 text-sm bg-red-50 rounded p-2">{error}</p>}
 
       <div className="flex gap-2">
-        <button type="submit" disabled={loading} className="btn-primary flex-1">
+        <button type="submit" disabled={loading || !pickedStart || !pickedEnd || !previewLine} className="btn-primary flex-1">
           {loading ? 'Generating…' : 'GENERATE DIVERSION'}
         </button>
         <button type="button" onClick={onClear} className="btn-secondary px-4">
