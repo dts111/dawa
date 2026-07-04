@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
+declare module 'maplibre-gl/dist/maplibre-gl.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { Closure, Diversion } from '../types'
 import { M25_JUNCTIONS } from '../junctions'
@@ -35,6 +36,7 @@ function markerPopupHtml(node: PickedNode, direction: string): string {
   return `
     <div style="font-size:12px;line-height:1.5;min-width:160px;">
       <div style="font-weight:700;margin-bottom:2px;">${roadName}</div>
+      <div>Node <strong>${node.node_id}</strong></div>
       <div>Direction: <strong>${DIRECTION_LABELS[direction] ?? direction}</strong></div>
       <div>${roadKind}${node.road_type ? ` &middot; ${node.road_type.replace(/_/g, ' ')}` : ''}</div>
       <div style="color:#6b7280;margin-top:2px;">${node.lat.toFixed(5)}, ${node.lng.toFixed(5)}</div>
@@ -545,6 +547,23 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
       {pickingMode && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-nh-blue text-white text-sm px-4 py-2 rounded shadow-lg z-10">
           Click map to set {pickingMode === 'start' ? 'start' : 'end'} point
+        </div>
+      )}
+
+      {!pickingMode && (pickedStart || pickedEnd) && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-white/95 border border-gray-200 text-gray-800 text-xs px-4 py-2 rounded shadow-lg z-10 flex gap-4">
+          {pickedStart && (
+            <span>
+              <strong>Start:</strong> Node {pickedStart.node_id} — {pickedStart.road_name ?? pickedStart.road_type ?? 'Unknown road'}
+              {pickedStart.is_junction ? ' (junction)' : ''}
+            </span>
+          )}
+          {pickedEnd && (
+            <span>
+              <strong>End:</strong> Node {pickedEnd.node_id} — {pickedEnd.road_name ?? pickedEnd.road_type ?? 'Unknown road'}
+              {pickedEnd.is_junction ? ' (junction)' : ''}
+            </span>
+          )}
         </div>
       )}
 

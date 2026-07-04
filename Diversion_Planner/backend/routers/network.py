@@ -167,10 +167,8 @@ def _offset_toward(from_pt: list, toward_pt: list, distance_m: float) -> list:
     ]
 
 
-@router.get("/preview-closure")
-async def preview_closure_line(start_node: int, end_node: int, conn: asyncpg.Connection = Depends(get_raw_conn)):
-    """Return the road path between two nodes as GeoJSON LineString, extended at both ends
-    to the nearest motorway/slip-road junction node so the full closure extent is visible."""
+async def _fetch_path_coords(conn: asyncpg.Connection, from_node: int, to_node: int) -> Optional[list]:
+    """Directed shortest-path geometry between two nodes as a flat coordinate list, or None."""
     row = await conn.fetchrow("""
         WITH dijkstra AS (
             SELECT path.edge
@@ -183,91 +181,87 @@ async def preview_closure_line(start_node: int, end_node: int, conn: asyncpg.Con
         SELECT ST_AsGeoJSON(ST_LineMerge(ST_Collect(rn.geom))) AS geojson
         FROM dijkstra d
         JOIN road_network rn ON rn.id = d.edge
-    """, start_node, end_node)
+    """, from_node, to_node)
     if not row or not row["geojson"]:
-        raise HTTPException(status_code=404, detail="No path found between the two nodes.")
-
+        return None
     geojson = json.loads(row["geojson"])
-
-    # Normalise to a flat coordinate list (handles both LineString and MultiLineString)
     if geojson["type"] == "MultiLineString":
-        coords = [c for ring in geojson["coordinates"] for c in ring]
+        return [c for ring in geojson["coordinates"] for c in ring]
+    return geojson["coordinates"]
+
+
+async def _node_lnglat(conn: asyncpg.Connection, node_id: int) -> Optional[list]:
+    """[lng, lat] for a road_network node, or None."""
+    row = await conn.fetchrow("""
+        SELECT
+            COALESCE(
+                (SELECT ST_X(ST_StartPoint(geom)) FROM road_network WHERE source = $1 AND cost > 0 LIMIT 1),
+                (SELECT ST_X(ST_EndPoint(geom))   FROM road_network WHERE target = $1 AND cost > 0 LIMIT 1)
+            ) AS lng,
+            COALESCE(
+                (SELECT ST_Y(ST_StartPoint(geom)) FROM road_network WHERE source = $1 AND cost > 0 LIMIT 1),
+                (SELECT ST_Y(ST_EndPoint(geom))   FROM road_network WHERE target = $1 AND cost > 0 LIMIT 1)
+            ) AS lat
+    """, node_id)
+    if not row or row["lng"] is None:
+        return None
+    return [float(row["lng"]), float(row["lat"])]
+
+
+async def _extend_to_junction(
+    conn: asyncpg.Connection, node_id: int, bearing: float, forward: bool
+) -> Optional[list]:
+    """If node_id isn't already a real junction, walk outward and return the connecting
+    path's coordinates, tip-trimmed 15m so it visually joins onto an existing line.
+    forward=True → path runs node_id -> junction (append to the end of a line).
+    forward=False → path runs junction -> node_id (prepend to the start of a line).
+    Returns None if node_id is already a junction or none is found."""
+    if await _node_has_impacted_road(conn, node_id):
+        return None
+    result = await _find_outward_junction(conn, node_id, forward=forward, closure_bearing=bearing)
+    if not result:
+        return None
+    junc_id = result[0]
+    ext_coords = await _fetch_path_coords(conn, node_id, junc_id) if forward else await _fetch_path_coords(conn, junc_id, node_id)
+    if not ext_coords or len(ext_coords) < 2:
+        return None
+    if forward:
+        ext_coords[-1] = _offset_toward(ext_coords[-1], ext_coords[-2], 15)
     else:
-        coords = geojson["coordinates"]
+        ext_coords[0] = _offset_toward(ext_coords[0], ext_coords[1], 15)
+    return ext_coords
+
+
+@router.get("/preview-closure")
+async def preview_closure_line(start_node: int, end_node: int, conn: asyncpg.Connection = Depends(get_raw_conn)):
+    """Return the road path between two nodes as GeoJSON LineString, extended at both ends
+    to the nearest motorway/slip-road junction node so the full closure extent is visible."""
+    coords = await _fetch_path_coords(conn, start_node, end_node)
+    if not coords:
+        raise HTTPException(status_code=404, detail="No path found between the two nodes.")
 
     # Bearing of the closure (degrees, 0-360). Used to filter the junction walk
     # to same-carriageway edges only — cross-carriageway connectors tagged
     # highway=motorway are ~90-180° off and will be excluded by cos(diff) > 0.5.
     closure_bearing = _bearing(coords[0], coords[-1])
 
-    junc_start_id = None
-    if not await _node_has_impacted_road(conn, start_node):
-        result = await _find_outward_junction(conn, start_node, forward=False, closure_bearing=closure_bearing)
-        if result:
-            junc_start_id = result[0]
+    start_ext = await _extend_to_junction(conn, start_node, closure_bearing, forward=False)
+    if start_ext:
+        coords = start_ext + coords
 
-    junc_end_id = None
-    if not await _node_has_impacted_road(conn, end_node):
-        result = await _find_outward_junction(conn, end_node, forward=True, closure_bearing=closure_bearing)
-        if result:
-            junc_end_id = result[0]
-
-    if junc_start_id:
-        ext_row = await conn.fetchrow("""
-            WITH dijkstra AS (
-                SELECT path.edge
-                FROM pgr_dijkstra(
-                    'SELECT id, source, target, cost, reverse_cost FROM road_network WHERE cost > 0',
-                    $1::bigint, $2::bigint, directed := true
-                ) path
-                WHERE path.edge >= 0
-            )
-            SELECT ST_AsGeoJSON(ST_LineMerge(ST_Collect(rn.geom))) AS geojson
-            FROM dijkstra d
-            JOIN road_network rn ON rn.id = d.edge
-        """, junc_start_id, start_node)
-        if ext_row and ext_row["geojson"]:
-            ext_geojson = json.loads(ext_row["geojson"])
-            ext_coords = (
-                [c for ring in ext_geojson["coordinates"] for c in ring]
-                if ext_geojson["type"] == "MultiLineString"
-                else ext_geojson["coordinates"]
-            )
-            if len(ext_coords) >= 2:
-                ext_coords[0] = _offset_toward(ext_coords[0], ext_coords[1], 15)
-                coords = ext_coords + coords
-
-    if junc_end_id:
-        ext_row = await conn.fetchrow("""
-            WITH dijkstra AS (
-                SELECT path.edge
-                FROM pgr_dijkstra(
-                    'SELECT id, source, target, cost, reverse_cost FROM road_network WHERE cost > 0',
-                    $1::bigint, $2::bigint, directed := true
-                ) path
-                WHERE path.edge >= 0
-            )
-            SELECT ST_AsGeoJSON(ST_LineMerge(ST_Collect(rn.geom))) AS geojson
-            FROM dijkstra d
-            JOIN road_network rn ON rn.id = d.edge
-        """, end_node, junc_end_id)
-        if ext_row and ext_row["geojson"]:
-            ext_geojson = json.loads(ext_row["geojson"])
-            ext_coords = (
-                [c for ring in ext_geojson["coordinates"] for c in ring]
-                if ext_geojson["type"] == "MultiLineString"
-                else ext_geojson["coordinates"]
-            )
-            if len(ext_coords) >= 2:
-                ext_coords[-1] = _offset_toward(ext_coords[-1], ext_coords[-2], 15)
-                coords = coords + ext_coords
+    end_ext = await _extend_to_junction(conn, end_node, closure_bearing, forward=True)
+    if end_ext:
+        coords = coords + end_ext
 
     return JSONResponse({"type": "LineString", "coordinates": coords})
 
 
 @router.get("/impacted-roads")
 async def get_impacted_roads(start_node: int, end_node: int, conn: asyncpg.Connection = Depends(get_raw_conn)):
-    """Return roads that connect to the closure path (slip roads, circulatories, trunk links)."""
+    """Return roads that connect to the closure path (slip roads, circulatories, trunk links),
+    each extended past its far end out to the nearest real junction — same principle as
+    preview_closure_line — so an impacted road reads as a full connector, not the single
+    short micro-edge that happens to touch the closure."""
     rows = await conn.fetch("""
         WITH closure_edges AS (
             SELECT path.edge
@@ -284,7 +278,9 @@ async def get_impacted_roads(start_node: int, end_node: int, conn: asyncpg.Conne
         ),
         closure_edge_ids AS (SELECT edge FROM closure_edges),
         connected AS (
-            SELECT rn.id, rn.osm_id, rn.name, rn.road_type, rn.source, rn.target, rn.geom
+            SELECT rn.id, rn.osm_id, rn.name, rn.road_type, rn.geom,
+                CASE WHEN rn.source IN (SELECT node_id FROM closure_nodes) THEN rn.source ELSE rn.target END AS near_node,
+                CASE WHEN rn.source IN (SELECT node_id FROM closure_nodes) THEN rn.target ELSE rn.source END AS far_node
             FROM road_network rn
             JOIN closure_nodes cn ON (rn.source = cn.node_id OR rn.target = cn.node_id)
             WHERE rn.id NOT IN (SELECT edge FROM closure_edge_ids)
@@ -296,24 +292,41 @@ async def get_impacted_roads(start_node: int, end_node: int, conn: asyncpg.Conne
             osm_id,
             MAX(COALESCE(name, road_type)) AS name,
             MAX(road_type) AS road_type,
-            (array_agg(source ORDER BY id))[1] AS source_node,
-            (array_agg(target ORDER BY id DESC))[1] AS target_node,
+            (array_agg(near_node ORDER BY id))[1] AS near_node,
+            (array_agg(far_node ORDER BY id DESC))[1] AS far_node,
             ST_AsGeoJSON(ST_LineMerge(ST_Collect(geom))) AS geojson
         FROM connected
         GROUP BY osm_id
     """, start_node, end_node)
 
-    return [
-        {
+    results = []
+    for r in rows:
+        if not r["geojson"]:
+            continue
+        geojson = json.loads(r["geojson"])
+        coords = [c for ring in geojson["coordinates"] for c in ring] if geojson["type"] == "MultiLineString" else geojson["coordinates"]
+
+        far_node = r["far_node"]
+        far_point = await _node_lnglat(conn, far_node)
+        if far_point and len(coords) >= 2:
+            d_first = math.hypot(coords[0][0] - far_point[0], coords[0][1] - far_point[1])
+            d_last = math.hypot(coords[-1][0] - far_point[0], coords[-1][1] - far_point[1])
+            far_is_last = d_last <= d_first
+            near_point = coords[0] if far_is_last else coords[-1]
+            road_bearing = _bearing(near_point, far_point)
+            ext = await _extend_to_junction(conn, far_node, road_bearing, forward=far_is_last)
+            if ext:
+                coords = (coords + ext) if far_is_last else (ext + coords)
+
+        results.append({
             "edge_id": r["edge_id"],
             "name": r["name"],
             "road_type": r["road_type"],
-            "source_node": r["source_node"],
-            "target_node": r["target_node"],
-            "geojson": json.loads(r["geojson"]),
-        }
-        for r in rows if r["geojson"]
-    ]
+            "source_node": r["near_node"],
+            "target_node": far_node,
+            "geojson": {"type": "LineString", "coordinates": coords},
+        })
+    return results
 
 
 @router.get("/node/{node_id}")
