@@ -31,11 +31,12 @@ export const findNearestNode = (lng: number, lat: number) =>
   ).then(r => r.data)
 
 // Routes
-export const generateRoutes = (closureId: string, vehicleType = 'car') =>
+export const generateRoutes = (closureId: string, vehicleType = 'car', engine = 'ors') =>
   api.post<Diversion[]>('/routes/generate', {
     closure_id: closureId,
     vehicle_type: vehicleType,
     n_alternatives: 3,
+    engine,
   }).then(r => r.data)
 
 export const getRoutesForClosure = (closureId: string) =>

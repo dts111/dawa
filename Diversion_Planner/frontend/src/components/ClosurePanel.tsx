@@ -29,6 +29,7 @@ export default function ClosurePanel({ onClosureCreated, onPickStart, onPickEnd,
     date_to: '',
     reason: '',
     vehicle_type: 'car',
+    engine: 'ors',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,7 +59,7 @@ export default function ClosurePanel({ onClosureCreated, onPickStart, onPickEnd,
         reason: form.reason || null,
         geom_geojson: previewLine ?? undefined,
       })
-      const routes = await generateRoutes(closure.id, form.vehicle_type)
+      const routes = await generateRoutes(closure.id, form.vehicle_type, form.engine)
 
       const closureTypeFor = (rt: string) =>
         rt === 'motorway_link' ? 'slip_entry'
@@ -201,6 +202,14 @@ export default function ClosurePanel({ onClosureCreated, onPickStart, onPickEnd,
         <select className="input" value={form.vehicle_type} onChange={e => set('vehicle_type', e.target.value)}>
           <option value="car">All vehicles</option>
           <option value="hgv">HGV (restricted roads excluded)</option>
+        </select>
+      </label>
+
+      <label className="block">
+        <span className="label">Routing Engine</span>
+        <select className="input" value={form.engine} onChange={e => set('engine', e.target.value)}>
+          <option value="ors">OpenRouteService (external)</option>
+          <option value="pgr">DBFO Network (pgRouting)</option>
         </select>
       </label>
 
