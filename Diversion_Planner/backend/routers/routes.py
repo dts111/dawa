@@ -23,7 +23,7 @@ async def generate_diversion_routes(
     closure = await session.get(Closure, body.closure_id)
     if not closure:
         raise HTTPException(status_code=404, detail="Closure not found")
-    if not closure.start_node or not closure.end_node:
+    if closure.start_node is None or closure.end_node is None:
         raise HTTPException(status_code=400, detail="Closure must have start_node and end_node set")
 
     # Extract closure geometry before routing (used both for avoidance and assessment)

@@ -10,15 +10,23 @@ router = APIRouter()
 
 
 async def _node_has_impacted_road(conn: asyncpg.Connection, node_id: int) -> bool:
-    """Return True if this node already connects to a slip road or impacted road type."""
+    """Return True if this node is a real junction — at least 3 distinct road segments
+    meet here (a branch) — and at least one of them is a slip/impacted road type.
+    A node with only 2 touching edges is just a pass-through point on a single link
+    chain (e.g. a micro-segment of a slip road), even if that edge happens to be
+    tagged motorway_link/trunk_link/etc; treating it as an already-resolved junction
+    would wrongly skip the outward walk to a real junction with alternate access."""
     row = await conn.fetchrow("""
-        SELECT 1 FROM road_network
-        WHERE (source = $1 OR target = $1)
-          AND road_type IN ('motorway_link', 'trunk_link', 'trunk', 'primary', 'primary_link')
-          AND cost > 0
-        LIMIT 1
+        WITH touching AS (
+            SELECT road_type FROM road_network WHERE source = $1 OR target = $1
+        )
+        SELECT (SELECT count(*) FROM touching) AS degree,
+               EXISTS (
+                   SELECT 1 FROM touching
+                   WHERE road_type IN ('motorway_link', 'trunk_link', 'trunk', 'primary', 'primary_link')
+               ) AS has_impacted
     """, node_id)
-    return row is not None
+    return bool(row and row["degree"] >= 3 and row["has_impacted"])
 
 
 async def _find_outward_junction(
@@ -32,24 +40,39 @@ async def _find_outward_junction(
     Walk along directed motorway edges from node_id, staying on the same carriageway.
     forward=False → walk backward (target→source) to find approach junction before start_node
     forward=True  → walk forward  (source→target) to find departure junction after end_node
-    closure_bearing (degrees) filters each edge so only edges pointing in the closure
-    direction are followed — cos(diff) > 0.5 means within 60° of closure direction.
-    ST_Azimuth returns radians so we convert closure_bearing via RADIANS($3).
+    The "stay on the same carriageway" filter compares each hop's bearing to the
+    *previous edge's* bearing (incremental heading), not to the fixed overall
+    closure_bearing — only the very first hop is checked against closure_bearing,
+    to make sure the walk sets off in the right direction. Interchange loops are
+    built from many short segments and often curve well past 60° in aggregate
+    while never making a sudden reversal; comparing every hop back to the original
+    fixed bearing would incorrectly kill the walk partway around such a curve even
+    though each individual turn is smooth. A hop is also let through regardless of
+    bearing if it's the only candidate edge available (no fork = no wrong turn to
+    guard against).
     Returns (node_id, lng, lat) of the first junction node found.
     """
     if forward:
         walk_sql = """
-            WITH RECURSIVE walk(node_id, depth) AS (
-                SELECT DISTINCT rn.target, 1
+            WITH RECURSIVE walk(node_id, depth, last_bearing) AS (
+                SELECT DISTINCT rn.target, 1, ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom))
                 FROM road_network rn
-                WHERE rn.source = $1 AND rn.road_type = 'motorway' AND rn.cost > 0
-                  AND cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
+                WHERE rn.source = $1 AND rn.road_type IN ('motorway', 'motorway_link') AND rn.cost > 0
+                  AND (
+                    cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
+                    OR (SELECT count(*) FROM road_network rnf WHERE rnf.source = $1
+                        AND rnf.road_type IN ('motorway', 'motorway_link') AND rnf.cost > 0) <= 1
+                  )
                 UNION ALL
-                SELECT DISTINCT rn.target, w.depth + 1
+                SELECT DISTINCT rn.target, w.depth + 1, ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom))
                 FROM walk w
                 JOIN road_network rn ON rn.source = w.node_id
-                WHERE rn.road_type = 'motorway' AND rn.cost > 0 AND w.depth < $2
-                  AND cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
+                WHERE rn.road_type IN ('motorway', 'motorway_link') AND rn.cost > 0 AND w.depth < $2
+                  AND (
+                    cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - w.last_bearing) > 0.5
+                    OR (SELECT count(*) FROM road_network rnf WHERE rnf.source = w.node_id
+                        AND rnf.road_type IN ('motorway', 'motorway_link') AND rnf.cost > 0) <= 1
+                  )
             )
             SELECT w.node_id,
                 COALESCE(
@@ -62,28 +85,36 @@ async def _find_outward_junction(
                 ) AS lat
             FROM walk w
             WHERE w.node_id != $1
+              AND (SELECT count(*) FROM road_network rn2 WHERE rn2.source = w.node_id OR rn2.target = w.node_id) >= 3
               AND EXISTS (
                 SELECT 1 FROM road_network rn
-                WHERE rn.target = w.node_id
+                WHERE (rn.source = w.node_id OR rn.target = w.node_id)
                   AND rn.road_type IN ('motorway_link', 'trunk_link', 'trunk', 'primary', 'primary_link')
-                  AND rn.cost > 0
               )
             ORDER BY w.depth ASC
             LIMIT 1
         """
     else:
         walk_sql = """
-            WITH RECURSIVE walk(node_id, depth) AS (
-                SELECT DISTINCT rn.source, 1
+            WITH RECURSIVE walk(node_id, depth, last_bearing) AS (
+                SELECT DISTINCT rn.source, 1, ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom))
                 FROM road_network rn
-                WHERE rn.target = $1 AND rn.road_type = 'motorway' AND rn.cost > 0
-                  AND cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
+                WHERE rn.target = $1 AND rn.road_type IN ('motorway', 'motorway_link') AND rn.cost > 0
+                  AND (
+                    cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
+                    OR (SELECT count(*) FROM road_network rnf WHERE rnf.target = $1
+                        AND rnf.road_type IN ('motorway', 'motorway_link') AND rnf.cost > 0) <= 1
+                  )
                 UNION ALL
-                SELECT DISTINCT rn.source, w.depth + 1
+                SELECT DISTINCT rn.source, w.depth + 1, ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom))
                 FROM walk w
                 JOIN road_network rn ON rn.target = w.node_id
-                WHERE rn.road_type = 'motorway' AND rn.cost > 0 AND w.depth < $2
-                  AND cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - RADIANS($3::float8)) > 0.5
+                WHERE rn.road_type IN ('motorway', 'motorway_link') AND rn.cost > 0 AND w.depth < $2
+                  AND (
+                    cos(ST_Azimuth(ST_StartPoint(rn.geom), ST_EndPoint(rn.geom)) - w.last_bearing) > 0.5
+                    OR (SELECT count(*) FROM road_network rnf WHERE rnf.target = w.node_id
+                        AND rnf.road_type IN ('motorway', 'motorway_link') AND rnf.cost > 0) <= 1
+                  )
             )
             SELECT w.node_id,
                 COALESCE(
@@ -96,11 +127,11 @@ async def _find_outward_junction(
                 ) AS lat
             FROM walk w
             WHERE w.node_id != $1
+              AND (SELECT count(*) FROM road_network rn2 WHERE rn2.source = w.node_id OR rn2.target = w.node_id) >= 3
               AND EXISTS (
                 SELECT 1 FROM road_network rn
-                WHERE rn.source = w.node_id
+                WHERE (rn.source = w.node_id OR rn.target = w.node_id)
                   AND rn.road_type IN ('motorway_link', 'trunk_link', 'trunk', 'primary', 'primary_link')
-                  AND rn.cost > 0
               )
             ORDER BY w.depth ASC
             LIMIT 1
