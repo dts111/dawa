@@ -33,11 +33,26 @@ export default function ClosurePanel({ onClosureCreated, onPickStart, onPickEnd,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reviewing, setReviewing] = useState(false)
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleReview = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!pickedStart?.node_id || !pickedEnd?.node_id) {
+      setError('Pick start and end points on the map first')
+      return
+    }
+    setError(null)
+    setReviewing(true)
+  }
+
+  const handleClear = () => {
+    setReviewing(false)
+    onClear()
+  }
+
+  const handleAccept = async () => {
     if (!pickedStart?.node_id || !pickedEnd?.node_id) {
       setError('Pick start and end points on the map first')
       return
@@ -90,139 +105,190 @@ export default function ClosurePanel({ onClosureCreated, onPickStart, onPickEnd,
     }
   }
 
+  const DIRECTION_LABELS: Record<string, string> = { CW: 'Clockwise', ACW: 'Anticlockwise', 'N/A': 'N/A' }
+  const CLOSURE_TYPE_LABELS: Record<string, string> = {
+    mainline: 'Mainline', slip_entry: 'Slip Entry', slip_exit: 'Slip Exit', interchange: 'Interchange',
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleReview} className="space-y-4">
       <h2 className="font-bold text-nh-blue text-lg border-b border-gray-200 pb-2">Define Closure</h2>
 
-      <div className="grid grid-cols-2 gap-3">
-        <label className="block">
-          <span className="label">Type</span>
-          <select className="input" value={form.closure_type} onChange={e => set('closure_type', e.target.value)}>
-            <option value="mainline">Mainline</option>
-            <option value="slip_entry">Slip Entry</option>
-            <option value="slip_exit">Slip Exit</option>
-            <option value="interchange">Interchange</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className="label">Direction</span>
-          <select className="input" value={direction} onChange={e => onDirectionChange(e.target.value)}>
-            <option value="CW">Clockwise</option>
-            <option value="ACW">Anticlockwise</option>
-            <option value="N/A">N/A</option>
-          </select>
-        </label>
-      </div>
-
-      {/* Node picking */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Network Nodes</p>
-        <div className="flex gap-2 items-center">
-          <button type="button" onClick={onPickStart} className="btn-secondary text-sm flex-1">
-            Start of closure
-          </button>
-          {pickedStart && <span className="text-green-600 text-lg">✓</span>}
-        </div>
-        <div className="flex gap-2 items-center">
-          <button type="button" onClick={onPickEnd} className="btn-secondary text-sm flex-1">
-            End of closure
-          </button>
-          {pickedEnd && <span className="text-green-600 text-lg">✓</span>}
-        </div>
-      </div>
-
-      {pickError && (
-        <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded p-2">{pickError}</p>
-      )}
-
-      {impactedRoads.length > 0 && (
-        <div className="border border-red-200 rounded-lg p-3 bg-red-50 space-y-1.5">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-xs font-semibold text-red-800 uppercase tracking-wide">
-              Impacted Roads
-            </p>
-            <span className="text-xs text-red-600">{selectedImpactedIds.length}/{impactedRoads.length} selected</span>
-          </div>
-          {impactedRoads.map(road => (
-            <label key={road.edge_id} className="flex items-center gap-2 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={selectedImpactedIds.includes(road.edge_id)}
-                onChange={() => onToggleImpacted(road.edge_id)}
-                className="rounded accent-green-600 shrink-0"
-              />
-              <span className="flex-1 text-xs text-red-700 font-medium truncate group-hover:text-red-900">
-                {road.name}
-              </span>
-              <span className="text-xs text-red-500 shrink-0 capitalize">
-                {road.road_type.replace(/_/g, ' ')}
-              </span>
+      {!reviewing && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="label">Type</span>
+              <select className="input" value={form.closure_type} onChange={e => set('closure_type', e.target.value)}>
+                <option value="mainline">Mainline</option>
+                <option value="slip_entry">Slip Entry</option>
+                <option value="slip_exit">Slip Exit</option>
+                <option value="interchange">Interchange</option>
+              </select>
             </label>
-          ))}
-        </div>
+            <label className="block">
+              <span className="label">Direction</span>
+              <select className="input" value={direction} onChange={e => onDirectionChange(e.target.value)}>
+                <option value="CW">Clockwise</option>
+                <option value="ACW">Anticlockwise</option>
+                <option value="N/A">N/A</option>
+              </select>
+            </label>
+          </div>
+
+          {/* Node picking */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Network Nodes</p>
+            <div className="flex gap-2 items-center">
+              <button type="button" onClick={onPickStart} className="btn-secondary text-sm flex-1">
+                Start of closure
+              </button>
+              {pickedStart && <span className="text-green-600 text-lg">✓</span>}
+            </div>
+            <div className="flex gap-2 items-center">
+              <button type="button" onClick={onPickEnd} className="btn-secondary text-sm flex-1">
+                End of closure
+              </button>
+              {pickedEnd && <span className="text-green-600 text-lg">✓</span>}
+            </div>
+          </div>
+
+          {pickError && (
+            <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded p-2">{pickError}</p>
+          )}
+
+          {impactedRoads.length > 0 && (
+            <div className="border border-red-200 rounded-lg p-3 bg-red-50 space-y-1.5">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-semibold text-red-800 uppercase tracking-wide">
+                  Impacted Roads
+                </p>
+                <span className="text-xs text-red-600">{selectedImpactedIds.length}/{impactedRoads.length} selected</span>
+              </div>
+              {impactedRoads.map(road => (
+                <label key={road.edge_id} className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={selectedImpactedIds.includes(road.edge_id)}
+                    onChange={() => onToggleImpacted(road.edge_id)}
+                    className="rounded accent-green-600 shrink-0"
+                  />
+                  <span className="flex-1 text-xs text-red-700 font-medium truncate group-hover:text-red-900">
+                    {road.name}
+                  </span>
+                  <span className="text-xs text-red-500 shrink-0 capitalize">
+                    {road.road_type.replace(/_/g, ' ')}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="label">Start Junction</span>
+              <input className="input" value={form.start_junction} onChange={e => set('start_junction', e.target.value)} placeholder="e.g. J10" />
+            </label>
+            <label className="block">
+              <span className="label">End Junction</span>
+              <input className="input" value={form.end_junction} onChange={e => set('end_junction', e.target.value)} placeholder="e.g. J11" />
+            </label>
+            <label className="block">
+              <span className="label">Start Chainage</span>
+              <input className="input" value={form.start_chainage} onChange={e => set('start_chainage', e.target.value)} placeholder="e.g. 37+200" />
+            </label>
+            <label className="block">
+              <span className="label">End Chainage</span>
+              <input className="input" value={form.end_chainage} onChange={e => set('end_chainage', e.target.value)} placeholder="e.g. 40+750" />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="label">Date From</span>
+              <input className="input" type="datetime-local" value={form.date_from} onChange={e => set('date_from', e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="label">Date To</span>
+              <input className="input" type="datetime-local" value={form.date_to} onChange={e => set('date_to', e.target.value)} />
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="label">Reason for Closure</span>
+            <textarea className="input resize-none" rows={2} value={form.reason} onChange={e => set('reason', e.target.value)} placeholder="e.g. Carriageway resurfacing — lane 1 and 2" />
+          </label>
+
+          <label className="block">
+            <span className="label">Vehicle Type for Routing</span>
+            <select className="input" value={form.vehicle_type} onChange={e => set('vehicle_type', e.target.value)}>
+              <option value="car">All vehicles</option>
+              <option value="hgv">HGV (restricted roads excluded)</option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="label">Routing Engine</span>
+            <select className="input" value={form.engine} onChange={e => set('engine', e.target.value)}>
+              <option value="pgr">DBFO Network (pgRouting)</option>
+              <option value="ors">OpenRouteService (external)</option>
+            </select>
+          </label>
+
+          {error && <p className="text-red-600 text-sm bg-red-50 rounded p-2">{error}</p>}
+
+          <div className="flex gap-2">
+            <button type="submit" disabled={!pickedStart || !pickedEnd || !previewLine} className="btn-primary flex-1">
+              GENERATE DIVERSION
+            </button>
+            <button type="button" onClick={handleClear} className="btn-secondary px-4">
+              Clear
+            </button>
+          </div>
+        </>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <label className="block">
-          <span className="label">Start Junction</span>
-          <input className="input" value={form.start_junction} onChange={e => set('start_junction', e.target.value)} placeholder="e.g. J10" />
-        </label>
-        <label className="block">
-          <span className="label">End Junction</span>
-          <input className="input" value={form.end_junction} onChange={e => set('end_junction', e.target.value)} placeholder="e.g. J11" />
-        </label>
-        <label className="block">
-          <span className="label">Start Chainage</span>
-          <input className="input" value={form.start_chainage} onChange={e => set('start_chainage', e.target.value)} placeholder="e.g. 37+200" />
-        </label>
-        <label className="block">
-          <span className="label">End Chainage</span>
-          <input className="input" value={form.end_chainage} onChange={e => set('end_chainage', e.target.value)} placeholder="e.g. 40+750" />
-        </label>
-      </div>
+      {reviewing && (
+        <>
+          <div className="border-l-4 border-nh-blue bg-blue-50 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-semibold text-sm">Closure Summary</span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-nh-blue text-white">
+                {DIRECTION_LABELS[direction] ?? direction}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+              <span>Type: <strong>{CLOSURE_TYPE_LABELS[form.closure_type] ?? form.closure_type}</strong></span>
+              <span>Vehicle: <strong>{form.vehicle_type === 'hgv' ? 'HGV' : 'All vehicles'}</strong></span>
+              <span>Start Junction: <strong>{form.start_junction || '—'}</strong></span>
+              <span>End Junction: <strong>{form.end_junction || '—'}</strong></span>
+              <span>Start Chainage: <strong>{form.start_chainage || '—'}</strong></span>
+              <span>End Chainage: <strong>{form.end_chainage || '—'}</strong></span>
+              <span>Date From: <strong>{form.date_from || '—'}</strong></span>
+              <span>Date To: <strong>{form.date_to || '—'}</strong></span>
+              <span>Routing Engine: <strong>{form.engine === 'pgr' ? 'DBFO Network (pgRouting)' : 'OpenRouteService'}</strong></span>
+              <span>Impacted Roads: <strong>{selectedImpactedIds.length}</strong></span>
+            </div>
+            {form.reason && (
+              <p className="mt-2 text-xs text-gray-600">Reason: <strong>{form.reason}</strong></p>
+            )}
+          </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <label className="block">
-          <span className="label">Date From</span>
-          <input className="input" type="datetime-local" value={form.date_from} onChange={e => set('date_from', e.target.value)} />
-        </label>
-        <label className="block">
-          <span className="label">Date To</span>
-          <input className="input" type="datetime-local" value={form.date_to} onChange={e => set('date_to', e.target.value)} />
-        </label>
-      </div>
+          {error && <p className="text-red-600 text-sm bg-red-50 rounded p-2">{error}</p>}
 
-      <label className="block">
-        <span className="label">Reason for Closure</span>
-        <textarea className="input resize-none" rows={2} value={form.reason} onChange={e => set('reason', e.target.value)} placeholder="e.g. Carriageway resurfacing — lane 1 and 2" />
-      </label>
-
-      <label className="block">
-        <span className="label">Vehicle Type for Routing</span>
-        <select className="input" value={form.vehicle_type} onChange={e => set('vehicle_type', e.target.value)}>
-          <option value="car">All vehicles</option>
-          <option value="hgv">HGV (restricted roads excluded)</option>
-        </select>
-      </label>
-
-      <label className="block">
-        <span className="label">Routing Engine</span>
-        <select className="input" value={form.engine} onChange={e => set('engine', e.target.value)}>
-          <option value="pgr">DBFO Network (pgRouting)</option>
-          <option value="ors">OpenRouteService (external)</option>
-        </select>
-      </label>
-
-      {error && <p className="text-red-600 text-sm bg-red-50 rounded p-2">{error}</p>}
-
-      <div className="flex gap-2">
-        <button type="submit" disabled={loading || !pickedStart || !pickedEnd || !previewLine} className="btn-primary flex-1">
-          {loading ? 'Generating…' : 'GENERATE DIVERSION'}
-        </button>
-        <button type="button" onClick={onClear} className="btn-secondary px-4">
-          Clear
-        </button>
-      </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={handleAccept} disabled={loading} className="btn-primary flex-1">
+              {loading ? 'Generating…' : 'Accept & Generate'}
+            </button>
+            <button type="button" onClick={() => setReviewing(false)} disabled={loading} className="btn-secondary px-4">
+              Edit
+            </button>
+            <button type="button" onClick={handleClear} disabled={loading} className="btn-secondary px-4">
+              Clear
+            </button>
+          </div>
+        </>
+      )}
     </form>
   )
 }
