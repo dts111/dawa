@@ -139,14 +139,6 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
     map.addLayer({ id: 'links-casing', type: 'line', source: 'interchange-links', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#1e3a5f', 'line-width': 7, 'line-opacity': 1 } })
     map.addLayer({ id: 'links-line', type: 'line', source: 'interchange-links', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#3b82f6', 'line-width': 4, 'line-opacity': 1 } })
 
-    // Closure section preview (shown while picking nodes, before closure is created)
-    const previewData: GeoJSON.FeatureCollection = previewLineRef.current
-      ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: previewLineRef.current, properties: {} }] }
-      : { type: 'FeatureCollection', features: [] }
-    map.addSource('preview-closure', { type: 'geojson', data: previewData })
-    map.addLayer({ id: 'preview-casing', type: 'line', source: 'preview-closure', paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.8 } })
-    map.addLayer({ id: 'preview-line', type: 'line', source: 'preview-closure', paint: { 'line-color': '#dc2626', 'line-width': 4, 'line-dasharray': [6, 3] } })
-
     // Impacted roads (slip roads, circulatories, connecting links that touch the closure)
     const impactedData: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
@@ -155,6 +147,15 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
     map.addSource('impacted-roads', { type: 'geojson', data: impactedData })
     map.addLayer({ id: 'impacted-casing', type: 'line', source: 'impacted-roads', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.7 } })
     map.addLayer({ id: 'impacted-line', type: 'line', source: 'impacted-roads', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#f97316', 'line-width': 4, 'line-dasharray': [5, 3] } })
+
+    // Closure section preview (shown while picking nodes, before closure is created)
+    // Added after impacted-roads so it always paints on top, even where the two overlap.
+    const previewData: GeoJSON.FeatureCollection = previewLineRef.current
+      ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: previewLineRef.current, properties: {} }] }
+      : { type: 'FeatureCollection', features: [] }
+    map.addSource('preview-closure', { type: 'geojson', data: previewData })
+    map.addLayer({ id: 'preview-casing', type: 'line', source: 'preview-closure', paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.8 } })
+    map.addLayer({ id: 'preview-line', type: 'line', source: 'preview-closure', paint: { 'line-color': '#dc2626', 'line-width': 4, 'line-dasharray': [6, 3] } })
 
     // Closure and diversion route layers (on top)
     map.addSource('closure', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
