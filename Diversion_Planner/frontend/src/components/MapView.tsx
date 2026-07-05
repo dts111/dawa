@@ -146,7 +146,7 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
     }
     map.addSource('impacted-roads', { type: 'geojson', data: impactedData })
     map.addLayer({ id: 'impacted-casing', type: 'line', source: 'impacted-roads', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.7 } })
-    map.addLayer({ id: 'impacted-line', type: 'line', source: 'impacted-roads', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#f97316', 'line-width': 4, 'line-dasharray': [5, 3] } })
+    map.addLayer({ id: 'impacted-line', type: 'line', source: 'impacted-roads', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#dc2626', 'line-width': 7 } })
 
     // Closure section preview (shown while picking nodes, before closure is created)
     // Added after impacted-roads so it always paints on top, even where the two overlap.
@@ -155,7 +155,7 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
       : { type: 'FeatureCollection', features: [] }
     map.addSource('preview-closure', { type: 'geojson', data: previewData })
     map.addLayer({ id: 'preview-casing', type: 'line', source: 'preview-closure', paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.8 } })
-    map.addLayer({ id: 'preview-line', type: 'line', source: 'preview-closure', paint: { 'line-color': '#dc2626', 'line-width': 4, 'line-dasharray': [6, 3] } })
+    map.addLayer({ id: 'preview-line', type: 'line', source: 'preview-closure', paint: { 'line-color': '#dc2626', 'line-width': 4 } })
 
     // Closure and diversion route layers (on top)
     map.addSource('closure', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
@@ -576,7 +576,7 @@ export default function MapView({ closure, routes, selectedRouteRank, onMapClick
         </label>
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={layers.impacted} onChange={() => toggleLayer('impacted')} className="rounded" />
-          <span className="w-6 inline-block border-t-2 border-dashed" style={{ borderColor: '#f97316' }} />Impacted roads
+          <span className="w-6 inline-block border-t-2" style={{ borderColor: '#dc2626' }} />Impacted roads
         </label>
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={layers.diversions} onChange={() => toggleLayer('diversions')} className="rounded" />
