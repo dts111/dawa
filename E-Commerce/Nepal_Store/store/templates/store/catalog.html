@@ -1,0 +1,146 @@
+{% extends 'store/base.html' %}
+{% load npr %}
+
+{% block title %}Products - Nepal Store{% endblock %}
+
+{% block content %}
+<div class="catalog-layout">
+
+  <div class="catalog-main">
+    <h1 class="page-title">Our Products</h1>
+
+    {% if products %}
+      {% for product in products %}
+      <div class="product-row">
+        <div class="product-row-photo">
+          {% if product.photo %}
+            <a href="{% url 'store:product_detail' product.pk %}">
+              <img src="{{ product.photo.url }}" alt="{{ product.name }}" loading="lazy">
+            </a>
+          {% else %}
+            <div class="photo-placeholder large">No photo</div>
+          {% endif %}
+        </div>
+
+        <div class="product-row-info">
+          <a href="{% url 'store:product_detail' product.pk %}" class="product-row-title">{{ product.name }}</a>
+
+          {% if product.description %}
+            <p class="product-row-desc">{{ product.description|truncatechars:180 }}</p>
+          {% endif %}
+
+          <div class="product-attrs">
+            {% if product.use_occasions %}
+            <div class="attr-row">
+              <span class="attr-label">Use:</span>
+              <span class="attr-value use-tags">{{ product.use_occasions }}</span>
+            </div>
+            {% endif %}
+            {% if product.pack_info %}
+            <div class="attr-row">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+              <span>{{ product.pack_info }}</span>
+            </div>
+            {% endif %}
+            {% if product.size_info %}
+            <div class="attr-row">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 3H3v18h18V3z"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+              <span>Size: {{ product.size_info }}</span>
+            </div>
+            {% endif %}
+            {% if product.origin %}
+            <div class="attr-row">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <span>{{ product.origin }}</span>
+            </div>
+            {% endif %}
+            {% if product.category %}
+            <div class="attr-row">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+              <span>{{ product.category.name }}</span>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="product-row-bottom">
+            <p class="price large">{{ product.price|npr }}</p>
+            <span class="cod-badge">Cash on Delivery</span>
+          </div>
+
+          {% if product.in_stock %}
+            <p class="stock in">In Stock</p>
+            <form method="post" action="{% url 'store:cart_add' product.pk %}" class="row-add-form">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{% url 'store:catalog' %}">
+              <div class="qty-stepper">
+                <button type="button" class="qty-btn" onclick="stepQty(this,-1)">&#8722;</button>
+                <input type="number" name="quantity" value="1" min="1" max="{{ product.stock_quantity }}" inputmode="numeric" class="qty-input">
+                <button type="button" class="qty-btn" onclick="stepQty(this,1)">&#43;</button>
+              </div>
+              <button type="submit" class="btn primary">Add to Cart</button>
+            </form>
+          {% else %}
+            <p class="stock out">Out of stock</p>
+          {% endif %}
+
+          <a href="{% url 'store:product_detail' product.pk %}" class="view-details-link">View Details &rarr;</a>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="empty">No products yet. Check back soon!</p>
+    {% endif %}
+  </div>
+
+  <aside class="cart-sidebar">
+    <div class="sidebar-inner">
+      <h2 class="sidebar-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        Cart Summary
+      </h2>
+      {% if cart.is_empty %}
+        <p class="sidebar-empty">Your cart is empty.</p>
+      {% else %}
+        <div class="sidebar-items">
+          {% for line in cart %}
+          <div class="sidebar-line">
+            <span class="sidebar-name">{{ line.product.name }}<br><small>{{ line.quantity }} × {{ line.product.price|npr }}</small></span>
+            <div class="sidebar-line-right">
+              <span class="sidebar-sub">{{ line.subtotal|npr }}</span>
+              <form method="post" action="{% url 'store:cart_remove' line.product.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'store:catalog' %}">
+                <button type="submit" class="sidebar-remove" title="Remove item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="sidebar-footer">
+          <div class="sidebar-total">
+            <span>Subtotal</span><strong>{{ cart.total|npr }}</strong>
+          </div>
+          <div class="sidebar-delivery">
+            <span>Delivery</span><span class="sidebar-free">FREE (COD)</span>
+          </div>
+          <a href="{% url 'store:checkout' %}" class="btn primary full">Proceed to Checkout</a>
+          <a href="{% url 'store:cart' %}" class="view-cart-link">View full cart</a>
+        </div>
+      {% endif %}
+    </div>
+  </aside>
+
+</div>
+
+<script>
+function stepQty(btn, delta) {
+  var input = btn.parentElement.querySelector('.qty-input');
+  var val = parseInt(input.value) + delta;
+  var min = parseInt(input.min) || 1;
+  var max = parseInt(input.max) || 999;
+  input.value = Math.min(max, Math.max(min, val));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends 'store/base.html' %}
+{% load npr %}
+
+{% block title %}Checkout - Nepal Store{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Checkout</h1>
+
+<div class="checkout-summary">
+  {% for line in cart %}
+  <p class="summary-line">
+    <span>{{ line.quantity }} x {{ line.product.name }}</span>
+    <span>{{ line.subtotal|npr }}</span>
+  </p>
+  {% endfor %}
+  <p class="summary-line total"><span>Total (Cash on Delivery)</span><strong>{{ cart.total|npr }}</strong></p>
+</div>
+
+<form method="post" class="checkout-form" novalidate>
+  {% csrf_token %}
+  {% for field in form %}
+  <div class="field{% if field.errors %} has-error{% endif %}">
+    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field }}
+    {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+    {% for error in field.errors %}<p class="error">{{ error }}</p>{% endfor %}
+  </div>
+  {% endfor %}
+  <button type="submit" class="btn primary full">Place order (Cash on Delivery)</button>
+</form>
+{% endblock %}

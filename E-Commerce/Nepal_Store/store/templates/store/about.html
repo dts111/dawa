@@ -1,0 +1,50 @@
+{% extends 'store/base.html' %}
+
+{% block title %}About Us - Nepal Store{% endblock %}
+
+{% block content %}
+<div class="about-page">
+  <div class="about-hero">
+    <h1>About Nepal Store</h1>
+    <p class="about-lead">We bring the best of Nepal to your doorstep — authentic, handpicked products made by skilled artisans across the country.</p>
+  </div>
+
+  <div class="about-grid">
+    <div class="about-card">
+      <div class="about-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      </div>
+      <h2>Our Story</h2>
+      <p>Nepal Store was created to share Nepal's rich cultural heritage with the world. From pashmina shawls woven in Kathmandu to orthodox tea from the hills of Ilam, every product tells a story of craftsmanship and tradition.</p>
+    </div>
+
+    <div class="about-card">
+      <div class="about-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <h2>Our Promise</h2>
+      <p>Every product is genuine, ethically sourced, and carefully selected. We work directly with local artisans and producers to ensure quality and fair trade. No middlemen — just authentic Nepali goods.</p>
+    </div>
+
+    <div class="about-card">
+      <div class="about-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      </div>
+      <h2>Cash on Delivery</h2>
+      <p>No online payment needed. Order what you love, and pay when it arrives at your door. We call to confirm every order personally — because your trust matters to us.</p>
+    </div>
+  </div>
+
+  <div class="about-values">
+    <h2>Why Choose Us?</h2>
+    <ul class="values-list">
+      <li>✔ 100% authentic Nepali products</li>
+      <li>✔ Cash on Delivery — pay on arrival</li>
+      <li>✔ Personal call to confirm every order</li>
+      <li>✔ Sourced directly from local artisans</li>
+      <li>✔ Fast delivery across Nepal</li>
+    </ul>
+    <a href="{% url 'store:catalog' %}" class="btn primary">Shop Now</a>
+  </div>
+</div>
+{% endblock %}

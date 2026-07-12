@@ -1,0 +1,48 @@
+{% extends 'store/base.html' %}
+{% load npr %}
+
+{% block title %}Your Cart - Nepal Store{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Your Cart</h1>
+
+{% if cart.is_empty %}
+<p class="empty">Your cart is empty. <a href="{% url 'store:catalog' %}">Browse products</a></p>
+{% else %}
+<div class="cart-list">
+  {% for line in cart %}
+  <div class="cart-line">
+    {% if line.product.photo %}
+      <img src="{{ line.product.photo.url }}" alt="{{ line.product.name }}">
+    {% else %}
+      <div class="photo-placeholder small">-</div>
+    {% endif %}
+    <div class="line-info">
+      <a href="{% url 'store:product_detail' line.product.pk %}">{{ line.product.name }}</a>
+      <p class="unit-price">{{ line.product.price|npr }} each</p>
+      <form method="post" action="{% url 'store:cart_update' line.product.pk %}" class="qty-form">
+        {% csrf_token %}
+        <input type="number" name="quantity" value="{{ line.quantity }}" min="0"
+               max="{{ line.product.stock_quantity }}" inputmode="numeric">
+        <button type="submit" class="btn small">Update</button>
+      </form>
+    </div>
+    <div class="line-right">
+      <p class="subtotal">{{ line.subtotal|npr }}</p>
+      <form method="post" action="{% url 'store:cart_remove' line.product.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="link-btn">Remove</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="cart-summary">
+  <p class="total-row"><span>Total</span><strong>{{ cart.total|npr }}</strong></p>
+  <p class="cod-note">Cash on Delivery - pay when your order arrives.</p>
+  <a href="{% url 'store:checkout' %}" class="btn primary full">Proceed to checkout</a>
+  <a href="{% url 'store:catalog' %}" class="back-link">&larr; Continue shopping</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,87 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Nepal Store{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="{% static 'store/style.css' %}?v=3">
+</head>
+<body>
+  <header class="site-header">
+    <a href="{% url 'store:home' %}" class="brand">Nepal Store</a>
+
+    <nav class="site-nav">
+      <a href="{% url 'store:home' %}" class="nav-link">Home</a>
+      <a href="{% url 'store:catalog' %}" class="nav-link">Products</a>
+      <a href="{% url 'store:about' %}" class="nav-link">About Us</a>
+      <a href="{% url 'store:contact' %}" class="nav-link">Contact</a>
+    </nav>
+
+    <a href="{% url 'store:cart' %}" class="cart-icon-link" aria-label="View cart">
+      <svg class="cart-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <path d="M16 10a4 4 0 0 1-8 0"/>
+      </svg>
+      {% with count=cart_count %}
+        {% if count %}<span class="cart-badge">{{ count }}</span>{% endif %}
+      {% endwith %}
+    </a>
+  </header>
+
+  {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+        <div class="message {{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-grid">
+      <div class="footer-col">
+        <p class="footer-brand">Nepal Store</p>
+        <p class="footer-tagline">Authentic Nepali products — handpicked crafts, teas, and gifts delivered to your door.</p>
+      </div>
+      <div class="footer-col">
+        <p class="footer-heading">Quick Links</p>
+        <ul class="footer-links">
+          <li><a href="{% url 'store:home' %}">Home</a></li>
+          <li><a href="{% url 'store:catalog' %}">Products</a></li>
+          <li><a href="{% url 'store:about' %}">About Us</a></li>
+          <li><a href="{% url 'store:contact' %}">Contact Us</a></li>
+          <li><a href="{% url 'store:cart' %}">Cart</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <p class="footer-heading">Contact Us</p>
+        <ul class="footer-contact">
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.6 3.38 2 2 0 0 1 3.58 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.62a16 16 0 0 0 6.29 6.29l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            <span>+977-XXXXXXXXXX</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <span>info@nepalstore.com</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>Kathmandu, Nepal</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>Cash on Delivery across Nepal &middot; We call to confirm every order</p>
+      <p class="footer-copy">&copy; {% now "Y" %} Nepal Store. All rights reserved.</p>
+    </div>
+  </footer>
+</body>
+</html>

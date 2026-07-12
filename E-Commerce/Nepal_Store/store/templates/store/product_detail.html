@@ -1,0 +1,36 @@
+{% extends 'store/base.html' %}
+{% load npr %}
+
+{% block title %}{{ product.name }} - Nepal Store{% endblock %}
+
+{% block content %}
+<div class="product-detail">
+  <div class="detail-photo">
+    {% if product.photo %}
+      <img src="{{ product.photo.url }}" alt="{{ product.name }}">
+    {% else %}
+      <div class="photo-placeholder large">No photo</div>
+    {% endif %}
+  </div>
+  <div class="detail-info">
+    <h1>{{ product.name }}</h1>
+    <p class="price large">{{ product.price|npr }}</p>
+    {% if product.in_stock %}
+      <p class="stock in">In stock</p>
+      <form method="post" action="{% url 'store:cart_add' product.pk %}" class="add-form">
+        {% csrf_token %}
+        <label for="qty">Quantity</label>
+        <input type="number" id="qty" name="quantity" value="1" min="1"
+               max="{{ product.stock_quantity }}" inputmode="numeric">
+        <button type="submit" class="btn primary">Add to cart</button>
+      </form>
+    {% else %}
+      <p class="stock out">Out of stock</p>
+    {% endif %}
+    {% if product.description %}
+      <div class="description">{{ product.description|linebreaks }}</div>
+    {% endif %}
+    <a href="{% url 'store:catalog' %}" class="back-link">&larr; Back to shop</a>
+  </div>
+</div>
+{% endblock %}

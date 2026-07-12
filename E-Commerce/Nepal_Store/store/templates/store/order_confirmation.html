@@ -1,0 +1,26 @@
+{% extends 'store/base.html' %}
+{% load npr %}
+
+{% block title %}Order Confirmed - Nepal Store{% endblock %}
+
+{% block content %}
+<div class="confirmation">
+  <h1>Thank you, {{ order.customer_name }}!</h1>
+  <p class="order-number">Your order number is <strong>#{{ order.pk }}</strong></p>
+  <p class="confirm-note">We'll call <strong>{{ order.phone }}</strong> shortly to confirm your delivery.</p>
+
+  <div class="order-summary">
+    <h2>Order summary</h2>
+    {% for item in order.items.all %}
+    <p class="summary-line">
+      <span>{{ item.quantity }} x {{ item.product.name }}</span>
+      <span>{{ item.subtotal|npr }}</span>
+    </p>
+    {% endfor %}
+    <p class="summary-line total"><span>Total (Cash on Delivery)</span><strong>{{ order.total|npr }}</strong></p>
+  </div>
+
+  <p class="delivery-note">Delivering to: {{ order.address_landmark }}</p>
+  <a href="{% url 'store:catalog' %}" class="btn primary">Back to shop</a>
+</div>
+{% endblock %}
