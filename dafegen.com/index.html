@@ -6,9 +6,16 @@
   <title>DAFEGEN — Bespoke Energy Software for Nepal & Emerging Markets</title>
   <meta name="description" content="DAFEGEN is a UK-registered bespoke software development company delivering tailored solutions for Nepal's energy sector — engineered to UK standards, scaled for the world." />
   <link rel="canonical" href="https://dafegen.com" />
+  <link rel="icon" type="image/png" href="favicon.png" />
   <meta property="og:url" content="https://dafegen.com" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="DAFEGEN — Bespoke Energy Software for Nepal & Emerging Markets" />
+  <meta property="og:description" content="UK-registered bespoke software development company delivering tailored solutions for Nepal's energy sector." />
+  <meta property="og:image" content="https://dafegen.com/favicon.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://dafegen.com/favicon.png" />
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@300;400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@300;400;500;600;700;800&display=swap');
 
     /* ─── CSS VARIABLES ─────────────────────────────────────────── */
     :root {
@@ -17,17 +24,17 @@
       --bg-card:     hsl(144, 14%, 96%);
       --bg-trust:    hsl(150, 8%, 90%);
       --navy:        hsl(210, 8%, 11%);
-      --blue:        hsl(43, 67%, 52%);
-      --blue-light:  hsl(43, 67%, 64%);
-      --purple:      hsl(43, 67%, 52%);
-      --purple-light:hsl(43, 67%, 64%);
+      --blue:        hsl(267, 68%, 42%);
+      --blue-light:  hsl(267, 68%, 55%);
+      --purple:      hsl(267, 68%, 42%);
+      --purple-light:hsl(267, 68%, 55%);
       --teal:        hsl(190, 43%, 28%);
       --orange:      hsl(30, 60%, 50%);
       --white:       #FFFFFF;
       --grey:        hsl(210, 8%, 28%);
       --grey-dim:    hsl(210, 5%, 40%);
-      --font-head:   'Instrument Serif', serif;
-      --font-body:   'Manrope', sans-serif;
+      --font-head:   'Barlow', sans-serif;
+      --font-body:   'Barlow', sans-serif;
       --font-mono:   'JetBrains Mono', monospace;
       --radius:      0.5rem;
       --transition:  0.25s ease;
@@ -99,14 +106,20 @@
     }
     .btn-primary {
       background: var(--blue);
-      color: var(--navy);
+      color: #FFFFFF;
       border: 2px solid var(--blue);
       font-weight: 600;
+    }
+    @keyframes pulse-ring {
+      0%   { box-shadow: 0 0 0 0 rgba(100, 34, 180, 0.6); }
+      70%  { box-shadow: 0 0 0 12px rgba(100, 34, 180, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(100, 34, 180, 0); }
     }
     .btn-primary:hover {
       background: var(--blue-light);
       border-color: var(--blue-light);
       transform: scale(1.02);
+      animation: pulse-ring 0.6s ease-out 1;
     }
     .btn-outline-white {
       background: transparent;
@@ -114,9 +127,11 @@
       border: 2px solid rgba(255,255,255,0.65);
     }
     .btn-outline-white:hover {
-      background: rgba(255,255,255,0.1);
-      border-color: var(--white);
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #FFFFFF;
       transform: scale(1.02);
+      animation: pulse-ring 0.6s ease-out 1;
     }
     .btn-outline-purple {
       background: transparent;
@@ -124,10 +139,11 @@
       border: 2px solid var(--blue);
     }
     .btn-outline-purple:hover {
-      background: hsla(43, 67%, 52%, 0.1);
-      border-color: var(--blue-light);
-      color: var(--navy);
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #FFFFFF;
       transform: scale(1.02);
+      animation: pulse-ring 0.6s ease-out 1;
     }
 
     /* Scroll reveal */
@@ -184,7 +200,7 @@
     .nav-links a {
       font-size: 1rem;
       font-weight: 500;
-      color: var(--grey);
+      color: #000000;
       letter-spacing: 0.01em;
       position: relative;
       transition: color var(--transition);
@@ -298,20 +314,29 @@
       max-width: 820px;
     }
 
+    @keyframes electric-glow {
+      0%   { background-position: 0% 50%; box-shadow: 0 0 8px 2px rgba(34,197,94,0.4), 0 0 2px 1px rgba(74,222,128,0.3); }
+      25%  { box-shadow: 0 0 16px 4px rgba(74,222,128,0.7), 0 0 4px 2px rgba(34,197,94,0.5); }
+      50%  { background-position: 100% 50%; box-shadow: 0 0 10px 3px rgba(16,185,129,0.5), 0 0 20px 6px rgba(34,197,94,0.3); }
+      75%  { box-shadow: 0 0 6px 1px rgba(74,222,128,0.6), 0 0 14px 3px rgba(34,197,94,0.4); }
+      100% { background-position: 0% 50%; box-shadow: 0 0 8px 2px rgba(34,197,94,0.4), 0 0 2px 1px rgba(74,222,128,0.3); }
+    }
     .hero-eyebrow {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: hsla(43, 67%, 52%, 0.15);
-      border: 1px solid hsla(43, 67%, 52%, 0.35);
+      background: linear-gradient(270deg, rgba(16,185,129,0.25), rgba(34,197,94,0.15), rgba(74,222,128,0.25), rgba(16,185,129,0.15));
+      background-size: 300% 300%;
+      border: 1px solid rgba(74,222,128,0.6);
       border-radius: 100px;
       padding: 6px 16px;
       font-size: 0.8rem;
       font-weight: 500;
-      color: hsl(43, 80%, 72%);
+      color: #FFFFFF;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       margin-bottom: 28px;
+      animation: electric-glow 2s ease-in-out infinite;
     }
     .hero-eyebrow .dot {
       width: 6px;
@@ -335,7 +360,22 @@
       margin-bottom: 28px;
       text-transform: uppercase;
     }
-    .hero-title .accent { color: hsl(43, 80%, 72%); }
+    .hero-title .accent { color: hsl(267, 68%, 55%); }
+    @keyframes electric-wave {
+      0%   { background-position: 0% 50%; }
+      100% { background-position: 100% 50%; }
+    }
+    .electric-text {
+      background: linear-gradient(90deg, #ffffff 0%, #ffffff 30%, #60a5fa 50%, #93c5fd 60%, #ffffff 80%, #ffffff 100%);
+      background-size: 300% 100%;
+      background-position: 0% 50%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .electric-text.playing {
+      animation: electric-wave 0.5s ease-in 1 forwards;
+    }
 
     .hero-sub {
       font-size: clamp(1rem, 1.8vw, 1.15rem);
@@ -352,6 +392,68 @@
     }
 
     /* Decorative bird silhouette */
+    @keyframes pulse-travel-h {
+      0%   { transform: translateX(-150px); opacity: 0; }
+      5%   { opacity: 1; }
+      95%  { opacity: 1; }
+      100% { transform: translateX(calc(100vw + 150px)); opacity: 0; }
+    }
+    @keyframes pulse-travel-v {
+      0%   { transform: translateY(-150px); opacity: 0; }
+      5%   { opacity: 1; }
+      95%  { opacity: 1; }
+      100% { transform: translateY(calc(100vh + 150px)); opacity: 0; }
+    }
+    /* Horizontal — bottom edge */
+    .hero-pulse-line-h {
+      position: absolute;
+      bottom: 1px;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(96,165,250,0.15), transparent);
+      z-index: 1;
+      pointer-events: none;
+    }
+    .hero-pulse-dot-h {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 140px;
+      height: 3px;
+      transform: translateX(-150px);
+      background: linear-gradient(90deg, transparent, #3b82f6, #ffffff, #3b82f6, transparent);
+      filter: blur(1px);
+      box-shadow: 0 0 12px 4px rgba(96,165,250,0.9), 0 0 30px 10px rgba(59,130,246,0.4);
+      animation: pulse-travel-h 2s ease-in-out 1 forwards;
+      z-index: 2;
+      pointer-events: none;
+    }
+    /* Vertical — left edge */
+    .hero-pulse-line-v {
+      position: absolute;
+      top: 0;
+      left: 1px;
+      width: 1px;
+      height: 100%;
+      background: linear-gradient(180deg, transparent, rgba(96,165,250,0.15), transparent);
+      z-index: 1;
+      pointer-events: none;
+    }
+    .hero-pulse-dot-v {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 3px;
+      height: 140px;
+      transform: translateY(-150px);
+      background: linear-gradient(180deg, transparent, #3b82f6, #ffffff, #3b82f6, transparent);
+      filter: blur(1px);
+      box-shadow: 0 0 12px 4px rgba(96,165,250,0.9), 0 0 30px 10px rgba(59,130,246,0.4);
+      animation: pulse-travel-v 2s ease-in-out 1 forwards;
+      z-index: 2;
+      pointer-events: none;
+    }
     .hero-bird-bg {
       position: absolute;
       right: -40px;
@@ -577,7 +679,7 @@
       letter-spacing: -0.02em;
       margin-bottom: 20px;
     }
-    .services-hero-panel .section-headline .accent { color: hsl(43, 80%, 72%); }
+    .services-hero-panel .section-headline .accent { color: hsl(267, 68%, 55%); }
     .services-hero-tagline {
       font-family: var(--font-body);
       font-size: 1.1rem;
@@ -871,7 +973,7 @@
       font-weight: 700;
       letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: hsl(43, 80%, 72%);
+      color: hsl(267, 68%, 55%);
       white-space: nowrap;
     }
     .live-dot {
@@ -933,7 +1035,7 @@
       letter-spacing: 0.04em;
     }
     .metric-tag.green { color: #4ade80; }
-    .metric-tag.amber { color: hsl(43, 80%, 72%); }
+    .metric-tag.amber { color: hsl(267, 68%, 55%); }
     .metric-tag.teal  { color: hsl(190, 60%, 58%); }
     .metric-tag-dot {
       width: 5px;
@@ -1209,6 +1311,23 @@
     .contact-card:hover { border-color: var(--blue); }
 
     .contact-card-flag { font-size: 2rem; margin-bottom: 10px; }
+    @keyframes flag-wave {
+      0%   { transform: perspective(400px) rotateY(0deg) scaleX(1); }
+      25%  { transform: perspective(400px) rotateY(8deg) scaleX(0.97); }
+      50%  { transform: perspective(400px) rotateY(0deg) scaleX(1); }
+      75%  { transform: perspective(400px) rotateY(-8deg) scaleX(0.97); }
+      100% { transform: perspective(400px) rotateY(0deg) scaleX(1); }
+    }
+    .flag-wave {
+      width: 56px;
+      height: auto;
+      margin-bottom: 10px;
+      display: block;
+      transform-origin: left center;
+      animation: flag-wave 2s ease-in-out infinite;
+      border-radius: 3px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
     .contact-card-title {
       font-family: var(--font-head);
       font-size: 1.05rem;
@@ -1469,7 +1588,7 @@
   <!-- ─── NAVIGATION ─────────────────────────────────────────── -->
   <nav id="navbar">
     <a href="#hero" class="nav-logo">
-      <img src="logo.jpeg?v=2" alt="DAFEGEN" class="nav-logo-img" />
+      <img src="logo.jpeg" alt="DAFEGEN" class="nav-logo-img" />
     </a>
 
     <ul class="nav-links">
@@ -1514,7 +1633,7 @@
         </div>
 
         <h1 class="hero-title reveal reveal-delay-1">
-          Powering Nepal's<br/>
+          <span class="electric-text">Powering Nepal's</span><br/>
           <span class="accent">Energy Future</span>
         </h1>
 
@@ -1532,6 +1651,12 @@
     </div>
 
     <div class="hero-bird-bg" aria-hidden="true">🦚</div>
+
+    <!-- L-shape border pulses: left edge down, then bottom edge right -->
+    <div class="hero-pulse-line-v" style="left:1px;" aria-hidden="true"></div>
+    <div class="hero-pulse-dot-v" style="left:0;animation-delay:0.3s;" aria-hidden="true"></div>
+    <div class="hero-pulse-line-h" style="bottom:1px;top:auto;" aria-hidden="true"></div>
+    <div class="hero-pulse-dot-h" style="bottom:0;top:auto;animation-delay:2s;" aria-hidden="true"></div>
   </section>
 
   <!-- ─── TRUST BAR ──────────────────────────────────────────── -->
@@ -1960,7 +2085,7 @@
         <div class="contact-info reveal reveal-delay-2">
 
           <div class="contact-card">
-            <div class="contact-card-flag">🇬🇧</div>
+            <div class="contact-card-flag"><img src="https://flagcdn.com/w80/gb.png" alt="UK Flag" class="flag-wave" /></div>
             <div class="contact-card-title">United Kingdom</div>
             <div class="contact-card-sub">Quatro House, Lyon Way<br>Frimley, Camberley<br>GU16 7ER, England</div>
             <a href="mailto:info@dafegen.com" class="contact-card-email">info@dafegen.com</a>
@@ -1968,7 +2093,10 @@
 
           <div class="contact-card" style="padding:0;overflow:hidden;">
             <div style="padding:18px 24px;display:flex;align-items:center;gap:10px;border-bottom:1px solid hsl(150,8%,85%);">
-              <span style="font-size:1.1rem;">📍</span>
+              <span style="display:inline-block;width:22px;height:28px;position:relative;flex-shrink:0;">
+                <span style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:18px;height:18px;background:var(--blue);border-radius:50% 50% 50% 0;transform:translateX(-50%) rotate(-45deg);box-shadow:0 2px 6px rgba(100,34,180,0.4);"></span>
+                <span style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:6px;height:6px;background:rgba(100,34,180,0.3);border-radius:50%;filter:blur(2px);"></span>
+              </span>
               <div>
                 <div class="contact-card-title" style="margin-bottom:0;font-size:0.95rem;">Find Us</div>
                 <div class="contact-card-sub" style="margin-bottom:0;font-size:0.78rem;">Quatro House, Lyon Way · GU16 7ER</div>
@@ -1987,7 +2115,7 @@
           </div>
 
           <div class="contact-card">
-            <div class="contact-card-flag">🇳🇵</div>
+            <div class="contact-card-flag"><img src="https://flagcdn.com/w80/np.png" alt="Nepal Flag" class="flag-wave" /></div>
             <div class="contact-card-title">Nepal</div>
             <div class="contact-card-sub">Kathmandu Operations</div>
             <a href="mailto:info@dafegen.com" class="contact-card-email">info@dafegen.com</a>
@@ -2022,7 +2150,7 @@
       <div class="footer-main">
 
         <div class="footer-brand">
-          <img src="logo.jpeg?v=2" alt="DAFEGEN" class="footer-logo-img" />
+          <img src="logo.jpeg" alt="DAFEGEN" class="footer-logo-img" />
           <p class="footer-tagline">Bespoke Energy Software · UK Registered · Nepal Focused</p>
           <p style="font-size:0.78rem;color:rgba(255,255,255,0.35);line-height:1.7;margin-top:10px;">
             Quatro House, Lyon Way<br>
@@ -2073,30 +2201,16 @@
       <button class="modal-close" onclick="closeModal()" aria-label="Close modal">✕</button>
 
       <div class="modal-logo">
-        <img src="logo.jpeg?v=2" alt="DAFEGEN" class="modal-logo-img" />
+        <img src="logo.jpeg" alt="DAFEGEN" class="modal-logo-img" />
         <div class="modal-subtitle" id="modalTitle">Login</div>
       </div>
 
       <div class="modal-divider"></div>
 
-      <form onsubmit="event.preventDefault()">
-        <div class="form-group">
-          <label for="staffEmail">Email Address</label>
-          <input type="email" id="staffEmail" placeholder="you@dafegen.com" autocomplete="email" />
-        </div>
-        <div class="form-group" style="margin-bottom:24px;">
-          <label for="staffPassword">Password</label>
-          <input type="password" id="staffPassword" placeholder="••••••••••" autocomplete="current-password" />
-        </div>
-        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;">
-          Sign In
-        </button>
-      </form>
-
-      <p class="modal-note">
-        Staff access only. For access requests contact<br/>
-        <a href="mailto:admin@dafegen.com">admin@dafegen.com</a>
-      </p>
+      <div style="text-align:center;padding:24px 0;">
+        <p style="font-size:1rem;color:var(--text-muted);margin-bottom:8px;">🔧 Staff login is currently under construction.</p>
+        <p style="font-size:0.9rem;color:var(--text-muted);">Please <a href="#contact" onclick="closeStaffModal()" style="color:var(--purple);text-decoration:underline;">contact us via the form</a> to get in touch.</p>
+      </div>
 
     </div>
   </div>
@@ -2184,5 +2298,19 @@
   </script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script>lucide.createIcons();</script>
+  <script>
+    (function () {
+      function triggerWave() {
+        const el = document.querySelector('.electric-text');
+        if (!el) return;
+        el.classList.remove('playing');
+        void el.offsetWidth;
+        el.classList.add('playing');
+        el.addEventListener('animationend', () => el.classList.remove('playing'), { once: true });
+      }
+      document.querySelector('.electric-text').addEventListener('mouseenter', triggerWave);
+      setInterval(triggerWave, 15000);
+    })();
+  </script>
 </body>
 </html>

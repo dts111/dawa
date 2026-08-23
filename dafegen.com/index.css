@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-heading: 'Instrument Serif', serif;
+    --font-body: 'Manrope', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --background: 144 14% 96%;
+    --foreground: 210 8% 11%;
+    --card: 144 14% 96%;
+    --card-foreground: 210 8% 11%;
+    --popover: 144 14% 96%;
+    --popover-foreground: 210 8% 11%;
+    --primary: 43 67% 52%;
+    --primary-foreground: 210 8% 11%;
+    --secondary: 190 43% 28%;
+    --secondary-foreground: 144 14% 96%;
+    --muted: 150 8% 90%;
+    --muted-foreground: 210 5% 40%;
+    --accent: 190 43% 28%;
+    --accent-foreground: 144 14% 96%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 150 8% 85%;
+    --input: 150 8% 85%;
+    --ring: 43 67% 52%;
+    --chart-1: 43 67% 52%;
+    --chart-2: 190 43% 28%;
+    --chart-3: 210 8% 11%;
+    --chart-4: 150 20% 60%;
+    --chart-5: 30 60% 50%;
+    --radius: 0.5rem;
+    --sidebar-background: 210 8% 11%;
+    --sidebar-foreground: 144 14% 96%;
+    --sidebar-primary: 43 67% 52%;
+    --sidebar-primary-foreground: 210 8% 11%;
+    --sidebar-accent: 210 8% 16%;
+    --sidebar-accent-foreground: 144 14% 96%;
+    --sidebar-border: 210 5% 20%;
+    --sidebar-ring: 43 67% 52%;
+  }
+
+  .dark {
+    --background: 210 8% 11%;
+    --foreground: 144 14% 96%;
+    --card: 210 8% 14%;
+    --card-foreground: 144 14% 96%;
+    --popover: 210 8% 14%;
+    --popover-foreground: 144 14% 96%;
+    --primary: 43 67% 52%;
+    --primary-foreground: 210 8% 11%;
+    --secondary: 190 43% 28%;
+    --secondary-foreground: 144 14% 96%;
+    --muted: 210 5% 18%;
+    --muted-foreground: 150 5% 55%;
+    --accent: 190 43% 28%;
+    --accent-foreground: 144 14% 96%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 210 5% 20%;
+    --input: 210 5% 20%;
+    --ring: 43 67% 52%;
+    --chart-1: 43 67% 52%;
+    --chart-2: 190 43% 38%;
+    --chart-3: 150 20% 60%;
+    --chart-4: 30 60% 50%;
+    --chart-5: 0 60% 50%;
+    --sidebar-background: 210 8% 8%;
+    --sidebar-foreground: 144 14% 96%;
+    --sidebar-primary: 43 67% 52%;
+    --sidebar-primary-foreground: 210 8% 11%;
+    --sidebar-accent: 210 8% 14%;
+    --sidebar-accent-foreground: 144 14% 96%;
+    --sidebar-border: 210 5% 16%;
+    --sidebar-ring: 43 67% 52%;
+  }
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
