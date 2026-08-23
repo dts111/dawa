@@ -2207,13 +2207,40 @@
 
       <div class="modal-divider"></div>
 
-      <div style="text-align:center;padding:24px 0;">
-        <p style="font-size:1rem;color:var(--text-muted);margin-bottom:8px;">🔧 Staff login is currently under construction.</p>
-        <p style="font-size:0.9rem;color:var(--text-muted);">Please <a href="#contact" onclick="closeStaffModal()" style="color:var(--purple);text-decoration:underline;">contact us via the form</a> to get in touch.</p>
-      </div>
+      <form id="staffLoginForm" onsubmit="checkStaffLogin(event)" style="padding:8px 0 0;">
+        <div class="form-group">
+          <label for="staffEmail">Email Address</label>
+          <input type="email" id="staffEmail" name="staffEmail" placeholder="you@dafegen.com" required autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label for="staffPassword">Password</label>
+          <input type="password" id="staffPassword" name="staffPassword" placeholder="Enter staff password" required autocomplete="current-password" />
+        </div>
+        <p id="staffLoginError" style="display:none;color:#c0392b;font-size:0.85rem;margin:-8px 0 14px;">Incorrect email or password. Please try again.</p>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:15px;">
+          Login
+        </button>
+        <p style="font-size:0.85rem;color:var(--text-muted);text-align:center;margin-top:16px;">Not staff? <a href="#contact" onclick="closeModal()" style="color:var(--purple);text-decoration:underline;">Contact us</a> instead.</p>
+      </form>
 
     </div>
   </div>
+
+  <!-- ─── STAFF AREA (placeholder, revealed after login) ────── -->
+  <section id="staffArea" class="staff-area" style="display:none;">
+    <div class="container">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px;">
+        <h2 class="section-headline" style="margin:0;">Welcome, Staff</h2>
+        <button class="btn btn-outline-purple" onclick="staffLogout()">Logout</button>
+      </div>
+      <p style="color:var(--text-muted);margin-bottom:20px;">This is a placeholder staff area — real resources and links will go here.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
+        <a href="#" class="contact-card" style="text-decoration:none;color:inherit;">Internal Docs</a>
+        <a href="#" class="contact-card" style="text-decoration:none;color:inherit;">Support</a>
+        <a href="#" class="contact-card" style="text-decoration:none;color:inherit;">Resources</a>
+      </div>
+    </div>
+  </section>
 
   <!-- ─── JAVASCRIPT ─────────────────────────────────────────── -->
   <script>
@@ -2274,6 +2301,10 @@
     }
 
     /* ── Staff Login Modal ──────────────────────────────────── */
+    // Credentials are verified server-side via POST /api/staff-login — nothing
+    // secret lives in this file. See dev-server.js for local testing.
+    const STAFF_SESSION_KEY = 'dafegenStaffAuthed';
+
     function openModal() {
       const m = document.getElementById('staffModal');
       m.classList.add('open');
@@ -2294,6 +2325,55 @@
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') closeModal();
     });
+
+    async function checkStaffLogin(event) {
+      event.preventDefault();
+      const emailInput = document.getElementById('staffEmail');
+      const passwordInput = document.getElementById('staffPassword');
+      const error = document.getElementById('staffLoginError');
+      const submitBtn = event.target.querySelector('button[type=submit]');
+
+      error.style.display = 'none';
+      submitBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/staff-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailInput.value.trim(), password: passwordInput.value }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          passwordInput.value = '';
+          sessionStorage.setItem(STAFF_SESSION_KEY, '1');
+          closeModal();
+          showStaffArea();
+        } else {
+          error.textContent = 'Incorrect email or password. Please try again.';
+          error.style.display = 'block';
+          passwordInput.focus();
+          passwordInput.select();
+        }
+      } catch (err) {
+        error.textContent = 'Staff login is temporarily unavailable — please check back soon.';
+        error.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+      }
+    }
+
+    function showStaffArea() {
+      document.getElementById('staffArea').style.display = 'block';
+    }
+
+    function staffLogout() {
+      sessionStorage.removeItem(STAFF_SESSION_KEY);
+      document.getElementById('staffArea').style.display = 'none';
+    }
+
+    if (sessionStorage.getItem(STAFF_SESSION_KEY) === '1') {
+      showStaffArea();
+    }
 
   </script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
