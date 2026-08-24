@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Minimal self-contained server bundle — needed for the Docker deploy on Fly.io.
+  output: "standalone",
   // better-sqlite3 is a native addon — it must stay outside the bundler.
   serverExternalPackages: ["better-sqlite3"],
   async headers() {
