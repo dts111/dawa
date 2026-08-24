@@ -12,9 +12,9 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Content-Security-Policy",
-            // Local dev: any port on localhost/127.0.0.1. Replace with the
-            // real dafegen.com origin(s) once this is deployed.
-            value: "frame-ancestors 'self' http://localhost:* http://127.0.0.1:*",
+            // localhost/127.0.0.1 for local dev, eaas-pm.fly.dev for the deployed app.
+            value:
+              "frame-ancestors 'self' http://localhost:* http://127.0.0.1:* https://eaas-pm.fly.dev",
           },
         ],
       },
