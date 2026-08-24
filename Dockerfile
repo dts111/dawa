@@ -19,6 +19,9 @@ RUN npm run build
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# Docker sets HOSTNAME to the container ID, which server.js falls back to
+# instead of 0.0.0.0 — override it or the app only listens on 127.0.0.1.
+ENV HOSTNAME=0.0.0.0
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
