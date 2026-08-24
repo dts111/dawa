@@ -29,14 +29,6 @@ export default function NewProjectForm() {
     }
   };
 
-  const loadDemo = async () => {
-    setBusy(true);
-    const res = await fetch("/api/demo", { method: "POST" });
-    const json = await res.json();
-    if (res.ok) router.push(`/project/${json.projectId}`);
-    else setBusy(false);
-  };
-
   return (
     <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
       <div className="flex flex-wrap items-end gap-3">
@@ -66,14 +58,6 @@ export default function NewProjectForm() {
           className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
         >
           Create plan
-        </button>
-        <button
-          type="button"
-          onClick={loadDemo}
-          disabled={busy}
-          className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 ring-inset transition hover:bg-slate-50 disabled:opacity-50"
-        >
-          Load worked example
         </button>
       </div>
       {error && <p className="mt-2 text-[13px] text-red-600">{error}</p>}
