@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import TaskGrid, { GRID_WIDTH, type ResizableCol } from "./TaskGrid";
 import GanttChart, { type Zoom } from "./GanttChart";
@@ -116,18 +116,34 @@ export default function PlanWorkspace({
 }) {
   const [bundle, setBundle] = useState(initial);
   const [view, setView] = useState<ViewKey>("gantt");
-  const [columnWidths, setColumnWidths] = useState<Record<ResizableCol, number>>(() => {
-    if (typeof window === "undefined") return DEFAULT_COLUMN_WIDTHS;
+  // Server-safe defaults so the client's hydration render matches the SSR
+  // markup exactly; the real values (if any) are restored after mount below.
+  const [columnWidths, setColumnWidths] = useState<Record<ResizableCol, number>>(DEFAULT_COLUMN_WIDTHS);
+  const [selected, setSelected] = useState<string[]>([]);
+  const collapsedKey = `eaas-pm:collapsed:${initial.project.id}`;
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  // Restoring a persisted UI preference from localStorage after mount, once —
+  // this is exactly what an effect is for, so the setState-in-effect rule
+  // doesn't apply here (it's not derivable during render without risking a
+  // hydration mismatch, since localStorage isn't available during SSR).
+  useEffect(() => {
     try {
       const stored = JSON.parse(window.localStorage.getItem(COLUMN_WIDTHS_KEY) ?? "null");
-      if (stored && typeof stored === "object") return { ...DEFAULT_COLUMN_WIDTHS, ...stored };
+      if (stored && typeof stored === "object") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setColumnWidths({ ...DEFAULT_COLUMN_WIDTHS, ...stored });
+      }
     } catch {
-      // Ignore malformed storage and fall back to defaults.
+      // Ignore malformed storage and keep the defaults.
     }
-    return DEFAULT_COLUMN_WIDTHS;
-  });
-  const [selected, setSelected] = useState<string[]>([]);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(collapsedKey) ?? "[]");
+      if (Array.isArray(stored) && stored.length) setCollapsed(new Set(stored));
+    } catch {
+      // Ignore malformed storage and keep everything expanded.
+    }
+  }, [collapsedKey]);
   const [zoom, setZoom] = useState<Zoom>("week");
   const [showBaseline, setShowBaseline] = useState(true);
   const [showCritical, setShowCritical] = useState(true);
@@ -140,6 +156,16 @@ export default function PlanWorkspace({
     setColumnWidths((prev) => {
       const next = { ...prev, [col]: width };
       localStorage.setItem(COLUMN_WIDTHS_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const toggleCollapse = (id: string) => {
+    setCollapsed((c) => {
+      const next = new Set(c);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      localStorage.setItem(collapsedKey, JSON.stringify([...next]));
       return next;
     });
   };
@@ -497,7 +523,7 @@ export default function PlanWorkspace({
                 Clear baseline
               </Btn>
             )}
-            <Btn onClick={() => setPanel("settings")}>Calendar</Btn>
+            <Btn onClick={() => setPanel("settings")}>Working calendar</Btn>
             {busy && <span className="ml-2 text-[12px] text-slate-400">Saving…</span>}
           </div>
         )}
@@ -567,14 +593,7 @@ export default function PlanWorkspace({
                     columnWidths={columnWidths}
                     onResizeColumn={resizeColumn}
                     onSelect={selectRow}
-                    onToggleCollapse={(id) =>
-                      setCollapsed((c) => {
-                        const next = new Set(c);
-                        if (next.has(id)) next.delete(id);
-                        else next.add(id);
-                        return next;
-                      })
-                    }
+                    onToggleCollapse={toggleCollapse}
                     onPatch={patchTask}
                     onSetStart={setTaskStart}
                     onSetFinish={setTaskFinish}

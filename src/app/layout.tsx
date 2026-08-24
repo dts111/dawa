@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "EaaS Project Management",
+  title: "Dafegen Project Management",
   description: "Plan, schedule and share project programmes with your team.",
 };
 

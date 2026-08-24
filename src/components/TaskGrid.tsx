@@ -256,10 +256,17 @@ export default function TaskGrid({
                   : "bg-white hover:bg-slate-50"
             }`}
           >
-            <Cell width={widths.wbs} align="center" className="text-[11px] text-slate-500">
+            <Cell
+              width={widths.wbs}
+              align="center"
+              className={t.level > 0 ? "text-[11px] text-slate-500" : "text-[11px] font-semibold text-slate-700"}
+            >
               {t.wbs}
             </Cell>
-            <Cell width={widths.name} className={t.isSummary ? "font-semibold text-slate-900" : "text-slate-800"}>
+            <Cell
+              width={widths.name}
+              className={t.isSummary || t.isMilestone ? "font-semibold text-slate-900" : "text-slate-800"}
+            >
               <div className="flex items-center" style={{ paddingLeft: t.level * 14 }}>
                 {t.isSummary ? (
                   <button
@@ -274,7 +281,7 @@ export default function TaskGrid({
                     {collapsed.has(t.id) ? "▸" : "▾"}
                   </button>
                 ) : (
-                  <span className="mr-1 w-4 shrink-0 text-center text-slate-300">
+                  <span className={`mr-1 w-4 shrink-0 text-center ${t.isMilestone ? "font-semibold" : ""} text-slate-300`}>
                     {t.isMilestone ? "◆" : "•"}
                   </span>
                 )}
