@@ -143,7 +143,7 @@ export default function BoardView({ bundle, readOnly, onSetStatus, onSetOwner, o
               type="button"
               onClick={() => setGroupBy(g)}
               className={`px-3 py-1 text-[13px] capitalize transition ${
-                groupBy === g ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+                groupBy === g ? "bg-brand text-white" : "bg-white text-slate-600 hover:bg-slate-50"
               }`}
             >
               {g}

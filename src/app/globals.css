@@ -1,23 +1,60 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens. Components use Tailwind's `slate-*` neutrals throughout, so
+ * re-tuning that scale here restyles the whole app at once: warm off-white
+ * surfaces, green-grey borders and a near-black navy for text. `brand` is the
+ * purple accent for primary actions, active states, links and focus rings.
+ * Status colours (statusTokens.ts) are functional and deliberately separate.
+ */
+@theme {
+  --color-slate-50: hsl(144 14% 97.5%);
+  --color-slate-100: hsl(144 14% 95%);
+  --color-slate-200: hsl(150 8% 87%);
+  --color-slate-300: hsl(150 8% 79%);
+  --color-slate-400: hsl(150 5% 60%);
+  --color-slate-500: hsl(210 5% 45%);
+  --color-slate-600: hsl(210 5% 37%);
+  --color-slate-700: hsl(210 7% 27%);
+  --color-slate-800: hsl(210 8% 17%);
+  --color-slate-900: hsl(210 8% 11%);
+  --color-slate-950: hsl(210 10% 7%);
+
+  --color-brand: hsl(267 68% 42%);
+  --color-brand-hover: hsl(267 68% 50%);
+  --color-brand-soft: hsl(267 68% 96%);
+  --color-brand-ring: hsl(267 68% 80%);
+  --color-teal: hsl(190 43% 28%);
+  --color-teal-soft: hsl(190 35% 94%);
+  --color-gold: hsl(43 67% 52%);
+
+  --shadow-card: 0 2px 8px rgb(0 0 0 / 0.04);
+  --shadow-float: 0 4px 20px rgb(0 0 0 / 0.08);
+}
+
 @theme inline {
-  --font-sans: var(--font-sans), ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: var(--font-barlow), ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 html,
 body {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--color-slate-100);
+  color: var(--color-slate-900);
 }
 
 ::selection {
-  background: #cbd5e1;
+  background: var(--color-brand-ring);
 }
 
 * {
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: var(--color-slate-300) transparent;
   scrollbar-width: thin;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
 }
 
 /* Numeric inputs in the task grid shouldn't show spinners — they fight the layout. */

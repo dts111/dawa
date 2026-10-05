@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import { buildWorkbook } from "@/lib/excel";
+import { getActiveShareLink } from "@/lib/db";
 import { loadProject } from "@/lib/projectData";
 
 export const runtime = "nodejs";
 
-type Ctx = { params: Promise<{ id: string }> };
+type Ctx = { params: Promise<{ token: string }> };
 
+/** Excel download for read-only viewers, authorised by their share token. */
 export async function GET(_req: Request, { params }: Ctx) {
-  const { id } = await params;
-  const bundle = loadProject(id);
-  if (!bundle) return NextResponse.json({ error: "Project not found." }, { status: 404 });
+  const { token } = await params;
+  const link = await getActiveShareLink(token);
+  const bundle = link ? await loadProject(link.projectId) : null;
+  if (!bundle) return NextResponse.json({ error: "This link is no longer active." }, { status: 404 });
 
   const buffer = await buildWorkbook(bundle);
   const safeName = bundle.project.name.replace(/[^a-z0-9\- ]/gi, "").trim() || "project";

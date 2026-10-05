@@ -5,14 +5,14 @@ import { todayISO } from "@/lib/calendar";
 export const runtime = "nodejs";
 
 export async function GET() {
-  return NextResponse.json({ projects: listProjects() });
+  return NextResponse.json({ projects: await listProjects() });
 }
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const name = String(body.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "A project name is required." }, { status: 400 });
-  const project = createProject({
+  const project = await createProject({
     name,
     description: body.description ?? null,
     startDate: body.startDate ?? todayISO(),

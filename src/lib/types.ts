@@ -110,13 +110,19 @@ export interface ScheduledTask extends Task {
   effectiveStatus: TaskStatus;
 }
 
-/** A public, read-only link to a plan. */
+/** A read-only link to a plan — anonymous, or a personal invite when `email` is set. */
 export interface ShareLink {
   token: string;
   projectId: string;
   label: string | null;
   createdAt: string;
   revokedAt: string | null;
+  /** Stakeholder the link was emailed to; null for an anonymous link. */
+  email: string | null;
+  message: string | null;
+  lastSentAt: string | null;
+  lastViewedAt: string | null;
+  viewCount: number;
 }
 
 export type AutomationTrigger =

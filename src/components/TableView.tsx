@@ -47,7 +47,7 @@ function EditableTextArea({
           (e.target as HTMLTextAreaElement).blur();
         }
       }}
-      className="w-full min-w-[200px] resize-y rounded-md border border-transparent bg-transparent px-2 py-1.5 text-[13px] leading-snug text-slate-700 outline-none transition hover:border-slate-200 focus:border-slate-300 focus:bg-white focus:ring-2 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:text-slate-400"
+      className="w-full min-w-[200px] resize-y rounded-md border border-transparent bg-transparent px-2 py-1.5 text-[13px] leading-snug text-slate-700 outline-none transition hover:border-slate-200 focus:border-slate-300 focus:bg-white focus:ring-2 focus:ring-brand/15 disabled:cursor-not-allowed disabled:text-slate-400"
     />
   );
 }
@@ -99,7 +99,7 @@ export default function TableView({ bundle, readOnly, onPatch, onSetOwner, onSel
                     value={t.resourceIds[0] ?? ""}
                     disabled={readOnly}
                     onChange={(e) => onSetOwner(t.id, e.target.value || null)}
-                    className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[13px] outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[13px] outline-none transition focus:border-brand focus:ring-3 focus:ring-brand/15 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <option value="">Unassigned</option>
                     {bundle.resources.map((r) => (

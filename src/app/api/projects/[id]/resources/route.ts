@@ -8,7 +8,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Ctx) {
   const { id } = await params;
-  return NextResponse.json({ resources: listResources(id) });
+  return NextResponse.json({ resources: await listResources(id) });
 }
 
 export async function POST(req: Request, { params }: Ctx) {
@@ -16,12 +16,12 @@ export async function POST(req: Request, { params }: Ctx) {
   const body = await req.json().catch(() => ({}));
   const name = String(body.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "A name is required." }, { status: 400 });
-  const resource = createResource({
+  const resource = await createResource({
     projectId: id,
     name,
     email: body.email ?? null,
     role: body.role ?? null,
     dayRate: Number(body.dayRate ?? 0),
   });
-  return NextResponse.json({ resource, bundle: loadProject(id) }, { status: 201 });
+  return NextResponse.json({ resource, bundle: await loadProject(id) }, { status: 201 });
 }

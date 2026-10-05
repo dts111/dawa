@@ -31,7 +31,7 @@ function wouldCreateCycle(tasks: Task[], taskId: string, candidateParentId: stri
 
 export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params;
-  const existing = getTask(id);
+  const existing = await getTask(id);
   if (!existing) return NextResponse.json({ error: "Task not found." }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
@@ -75,26 +75,26 @@ export async function PATCH(req: Request, { params }: Ctx) {
   }
 
   if (body.parentId !== undefined) {
-    const tasks = listTasks(existing.projectId);
+    const tasks = await listTasks(existing.projectId);
     if (wouldCreateCycle(tasks, id, body.parentId)) {
       return NextResponse.json({ error: "That move would nest a task inside itself." }, { status: 400 });
     }
     patch.parentId = body.parentId;
   }
 
-  const task = updateTask(id, patch);
-  return NextResponse.json({ task, bundle: loadProject(existing.projectId) });
+  const task = await updateTask(id, patch);
+  return NextResponse.json({ task, bundle: await loadProject(existing.projectId) });
 }
 
 export async function DELETE(_req: Request, { params }: Ctx) {
   const { id } = await params;
-  const existing = getTask(id);
+  const existing = await getTask(id);
   if (!existing) return NextResponse.json({ error: "Task not found." }, { status: 404 });
-  deleteTask(id);
-  logActivity({
+  await deleteTask(id);
+  await logActivity({
     projectId: existing.projectId,
     actor: "app",
     message: `Task "${existing.name}" deleted`,
   });
-  return NextResponse.json({ ok: true, bundle: loadProject(existing.projectId) });
+  return NextResponse.json({ ok: true, bundle: await loadProject(existing.projectId) });
 }

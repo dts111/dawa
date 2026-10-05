@@ -1,10 +1,13 @@
-// SQLite storage layer. One file on disk, no server, no monthly bill.
+// Storage layer on libSQL (SQLite-compatible).
 //
-// Every query is written in plain SQL and confined to this file, so swapping
-// SQLite for Postgres later means rewriting this module only — nothing in the
-// UI or the scheduling engine knows which database is underneath.
+// Locally this opens a plain SQLite file (data/eaas-pm.db). In production,
+// point DATABASE_URL at a hosted Turso database so the app can run on
+// serverless or disk-less hosts (Netlify, Render free tier) at no cost.
+//
+// Every query is written in plain SQL and confined to this file, so nothing in
+// the UI or the scheduling engine knows which database is underneath.
 
-import Database from "better-sqlite3";
+import { createClient, type Client, type InArgs, type InStatement } from "@libsql/client";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -21,22 +24,71 @@ import type {
   TaskStatus,
 } from "./types";
 
-const DB_PATH = process.env.DATABASE_FILE ?? path.join(process.cwd(), "data", "eaas-pm.db");
-
-let db: Database.Database | null = null;
-
-export function getDb(): Database.Database {
-  if (db) return db;
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  migrate(db);
-  return db;
+/** DATABASE_URL wins (libsql://… for Turso, or file:…); DATABASE_FILE is the older local-only setting. */
+function databaseUrl(): string {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  const file = process.env.DATABASE_FILE || path.join("data", "eaas-pm.db");
+  // The local file is a runtime path, not a build input — keep the bundler from
+  // tracing (and shipping) the whole project, database included.
+  const abs = path.isAbsolute(file) ? file : path.join(/*turbopackIgnore: true*/ process.cwd(), file);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  return `file:${abs.replace(/\\/g, "/")}`;
 }
 
-function migrate(d: Database.Database) {
-  d.exec(`
+let client: Client | null = null;
+let ready: Promise<void> | null = null;
+
+/** Opens the connection and runs migrations once per process. */
+async function db(): Promise<Client> {
+  if (!client) {
+    const url = databaseUrl();
+    client = createClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN || undefined });
+    ready = migrate(client, url.startsWith("file:"));
+  }
+  try {
+    await ready;
+  } catch (e) {
+    // Let the next request retry rather than caching a failed start-up forever.
+    client = null;
+    ready = null;
+    throw e;
+  }
+  return client;
+}
+
+/** libSQL rejects `undefined` as a bound value, so normalise to null. */
+function clean(args: unknown[]): InArgs {
+  return args.map((a) => (a === undefined ? null : a)) as InArgs;
+}
+
+async function all<T>(sql: string, ...args: unknown[]): Promise<T[]> {
+  const rs = await (await db()).execute({ sql, args: clean(args) });
+  return rs.rows.map((row) => Object.fromEntries(rs.columns.map((c, i) => [c, row[i]])) as T);
+}
+
+async function get<T>(sql: string, ...args: unknown[]): Promise<T | null> {
+  return (await all<T>(sql, ...args))[0] ?? null;
+}
+
+async function run(sql: string, ...args: unknown[]): Promise<void> {
+  await (await db()).execute({ sql, args: clean(args) });
+}
+
+/** Runs several statements atomically. */
+async function transaction(statements: { sql: string; args: unknown[] }[]): Promise<void> {
+  if (!statements.length) return;
+  await (await db()).batch(
+    statements.map((s): InStatement => ({ sql: s.sql, args: clean(s.args) })),
+    "write",
+  );
+}
+
+async function migrate(d: Client, isFile: boolean) {
+  if (isFile) {
+    await d.execute("PRAGMA journal_mode = WAL");
+  }
+  await d.execute("PRAGMA foreign_keys = ON");
+  await d.executeMultiple(`
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -117,7 +169,7 @@ function migrate(d: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_activity_project ON activity(projectId);
 
-    -- Public read-only links, so the wider team can see a plan before logins exist.
+    -- Read-only links: anonymous ones, and personal ones emailed to stakeholders.
     CREATE TABLE IF NOT EXISTS share_links (
       token TEXT PRIMARY KEY,
       projectId TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -155,18 +207,26 @@ function migrate(d: Database.Database) {
     );
   `);
 
-  addColumnIfMissing(d, "tasks", "status", "TEXT");
-  addColumnIfMissing(d, "tasks", "objectives", "TEXT");
-  addColumnIfMissing(d, "tasks", "guidance", "TEXT");
-  addColumnIfMissing(d, "tasks", "remarks", "TEXT");
-  addColumnIfMissing(d, "tasks", "risk", "TEXT");
+  await addColumnIfMissing(d, "tasks", "status", "TEXT");
+  await addColumnIfMissing(d, "tasks", "objectives", "TEXT");
+  await addColumnIfMissing(d, "tasks", "guidance", "TEXT");
+  await addColumnIfMissing(d, "tasks", "remarks", "TEXT");
+  await addColumnIfMissing(d, "tasks", "risk", "TEXT");
+
+  // Personal stakeholder invites.
+  await addColumnIfMissing(d, "share_links", "email", "TEXT");
+  await addColumnIfMissing(d, "share_links", "message", "TEXT");
+  await addColumnIfMissing(d, "share_links", "lastSentAt", "TEXT");
+  await addColumnIfMissing(d, "share_links", "lastViewedAt", "TEXT");
+  await addColumnIfMissing(d, "share_links", "viewCount", "INTEGER NOT NULL DEFAULT 0");
 }
 
 /** SQLite has no "ADD COLUMN IF NOT EXISTS", so check the table info first. */
-function addColumnIfMissing(d: Database.Database, table: string, column: string, type: string) {
-  const cols = d.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
-  if (!cols.some((c) => c.name === column)) {
-    d.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+async function addColumnIfMissing(d: Client, table: string, column: string, type: string) {
+  const rs = await d.execute(`PRAGMA table_info(${table})`);
+  const nameIdx = rs.columns.indexOf("name");
+  if (!rs.rows.some((r) => r[nameIdx] === column)) {
+    await d.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
   }
 }
 
@@ -227,79 +287,73 @@ function mapProject(r: ProjectRow): Project {
 
 // --- Projects --------------------------------------------------------------
 
-export function listProjects(): Project[] {
-  return (getDb().prepare("SELECT * FROM projects ORDER BY createdAt DESC").all() as ProjectRow[]).map(
-    mapProject,
-  );
+export async function listProjects(): Promise<Project[]> {
+  return (await all<ProjectRow>("SELECT * FROM projects ORDER BY createdAt DESC")).map(mapProject);
 }
 
-export function getProject(id: string): Project | null {
-  const r = getDb().prepare("SELECT * FROM projects WHERE id = ?").get(id) as ProjectRow | undefined;
+export async function getProject(id: string): Promise<Project | null> {
+  const r = await get<ProjectRow>("SELECT * FROM projects WHERE id = ?", id);
   return r ? mapProject(r) : null;
 }
 
-export function createProject(input: {
+export async function createProject(input: {
   name: string;
   description?: string | null;
   startDate: string;
   holidays?: string[];
   workingDays?: number[];
-}): Project {
+}): Promise<Project> {
   const id = newId();
-  getDb()
-    .prepare(
-      `INSERT INTO projects (id, name, description, startDate, holidays, workingDays, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      id,
-      input.name,
-      input.description ?? null,
-      input.startDate,
-      JSON.stringify(input.holidays ?? []),
-      JSON.stringify(input.workingDays ?? [1, 2, 3, 4, 5]),
-      now(),
-    );
-  return getProject(id)!;
+  await run(
+    `INSERT INTO projects (id, name, description, startDate, holidays, workingDays, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    input.name,
+    input.description ?? null,
+    input.startDate,
+    JSON.stringify(input.holidays ?? []),
+    JSON.stringify(input.workingDays ?? [1, 2, 3, 4, 5]),
+    now(),
+  );
+  return (await getProject(id))!;
 }
 
-export function updateProject(id: string, patch: Partial<Project>): Project | null {
-  const existing = getProject(id);
+export async function updateProject(id: string, patch: Partial<Project>): Promise<Project | null> {
+  const existing = await getProject(id);
   if (!existing) return null;
   const merged = { ...existing, ...patch };
-  getDb()
-    .prepare(
-      `UPDATE projects SET name = ?, description = ?, startDate = ?, holidays = ?, workingDays = ?
-       WHERE id = ?`,
-    )
-    .run(
-      merged.name,
-      merged.description,
-      merged.startDate,
-      JSON.stringify(merged.holidays),
-      JSON.stringify(merged.workingDays),
-      id,
-    );
+  await run(
+    `UPDATE projects SET name = ?, description = ?, startDate = ?, holidays = ?, workingDays = ?
+     WHERE id = ?`,
+    merged.name,
+    merged.description,
+    merged.startDate,
+    JSON.stringify(merged.holidays),
+    JSON.stringify(merged.workingDays),
+    id,
+  );
   return getProject(id);
 }
 
-export function deleteProject(id: string) {
-  getDb().prepare("DELETE FROM projects WHERE id = ?").run(id);
+export async function deleteProject(id: string) {
+  await run("DELETE FROM projects WHERE id = ?", id);
 }
 
 // --- Tasks -----------------------------------------------------------------
 
-export function listTasks(projectId: string): Task[] {
-  return getDb()
-    .prepare("SELECT * FROM tasks WHERE projectId = ? ORDER BY sortOrder, createdAt")
-    .all(projectId) as Task[];
+export async function listTasks(projectId: string): Promise<Task[]> {
+  return all<Task>("SELECT * FROM tasks WHERE projectId = ? ORDER BY sortOrder, createdAt", projectId);
 }
 
-export function getTask(id: string): Task | null {
-  return (getDb().prepare("SELECT * FROM tasks WHERE id = ?").get(id) as Task) ?? null;
+export async function countTasks(projectId: string): Promise<number> {
+  return (await get<{ n: number }>("SELECT COUNT(*) AS n FROM tasks WHERE projectId = ?", projectId))?.n ?? 0;
 }
 
-export function createTask(input: {
+export async function getTask(id: string): Promise<Task | null> {
+  return get<Task>("SELECT * FROM tasks WHERE id = ?", id);
+}
+
+export async function createTask(input: {
   projectId: string;
   name: string;
   parentId?: string | null;
@@ -309,36 +363,30 @@ export function createTask(input: {
   constraintDate?: string | null;
   percentComplete?: number;
   notes?: string | null;
-}): Task {
+}): Promise<Task> {
   const id = newId();
   const order =
     input.sortOrder ??
-    ((
-      getDb()
-        .prepare("SELECT COALESCE(MAX(sortOrder), 0) AS m FROM tasks WHERE projectId = ?")
-        .get(input.projectId) as { m: number }
-    ).m +
+    ((await get<{ m: number }>("SELECT COALESCE(MAX(sortOrder), 0) AS m FROM tasks WHERE projectId = ?", input.projectId))!
+      .m +
       10);
-  getDb()
-    .prepare(
-      `INSERT INTO tasks (id, projectId, parentId, sortOrder, name, duration, constraintType,
-                          constraintDate, percentComplete, notes, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      id,
-      input.projectId,
-      input.parentId ?? null,
-      order,
-      input.name,
-      input.duration ?? 1,
-      input.constraintType ?? "ASAP",
-      input.constraintDate ?? null,
-      input.percentComplete ?? 0,
-      input.notes ?? null,
-      now(),
-    );
-  return getTask(id)!;
+  await run(
+    `INSERT INTO tasks (id, projectId, parentId, sortOrder, name, duration, constraintType,
+                        constraintDate, percentComplete, notes, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    input.projectId,
+    input.parentId ?? null,
+    order,
+    input.name,
+    input.duration ?? 1,
+    input.constraintType ?? "ASAP",
+    input.constraintDate ?? null,
+    input.percentComplete ?? 0,
+    input.notes ?? null,
+    now(),
+  );
+  return (await getTask(id))!;
 }
 
 const TASK_FIELDS = [
@@ -360,123 +408,142 @@ const TASK_FIELDS = [
   "baselineDuration",
 ] as const;
 
-export function updateTask(id: string, patch: Partial<Task>): Task | null {
+export async function updateTask(id: string, patch: Partial<Task>): Promise<Task | null> {
   const keys = TASK_FIELDS.filter((k) => k in patch);
   if (!keys.length) return getTask(id);
   const sql = `UPDATE tasks SET ${keys.map((k) => `${k} = ?`).join(", ")} WHERE id = ?`;
-  getDb()
-    .prepare(sql)
-    .run(...keys.map((k) => (patch as Record<string, unknown>)[k] as never), id);
+  await run(sql, ...keys.map((k) => (patch as Record<string, unknown>)[k]), id);
   return getTask(id);
 }
 
-export function deleteTask(id: string) {
-  getDb().prepare("DELETE FROM tasks WHERE id = ?").run(id);
+export async function deleteTask(id: string) {
+  await run("DELETE FROM tasks WHERE id = ?", id);
 }
 
 /** Persist current computed dates as the baseline for every task in a project. */
-export function saveBaseline(projectId: string, computed: { id: string; start: string; finish: string; duration: number }[]) {
-  const d = getDb();
-  const stmt = d.prepare(
-    "UPDATE tasks SET baselineStart = ?, baselineFinish = ?, baselineDuration = ? WHERE id = ? AND projectId = ?",
+export async function saveBaseline(
+  projectId: string,
+  computed: { id: string; start: string; finish: string; duration: number }[],
+) {
+  await transaction(
+    computed.map((t) => ({
+      sql: "UPDATE tasks SET baselineStart = ?, baselineFinish = ?, baselineDuration = ? WHERE id = ? AND projectId = ?",
+      args: [t.start, t.finish, t.duration, t.id, projectId],
+    })),
   );
-  const tx = d.transaction(() => {
-    for (const t of computed) stmt.run(t.start, t.finish, t.duration, t.id, projectId);
-  });
-  tx();
 }
 
-export function clearBaseline(projectId: string) {
-  getDb()
-    .prepare(
-      "UPDATE tasks SET baselineStart = NULL, baselineFinish = NULL, baselineDuration = NULL WHERE projectId = ?",
-    )
-    .run(projectId);
+export async function clearBaseline(projectId: string) {
+  await run(
+    "UPDATE tasks SET baselineStart = NULL, baselineFinish = NULL, baselineDuration = NULL WHERE projectId = ?",
+    projectId,
+  );
 }
 
 // --- Dependencies ----------------------------------------------------------
 
-export function listDependencies(projectId: string): Dependency[] {
-  return getDb().prepare("SELECT * FROM dependencies WHERE projectId = ?").all(projectId) as Dependency[];
+export async function listDependencies(projectId: string): Promise<Dependency[]> {
+  return all<Dependency>("SELECT * FROM dependencies WHERE projectId = ?", projectId);
 }
 
-export function createDependency(input: {
+export async function createDependency(input: {
   projectId: string;
   predecessorId: string;
   successorId: string;
   type?: DependencyType;
   lag?: number;
-}): Dependency | null {
+}): Promise<Dependency | null> {
   if (input.predecessorId === input.successorId) return null;
-  const id = newId();
-  getDb()
-    .prepare(
-      `INSERT INTO dependencies (id, projectId, predecessorId, successorId, type, lag)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(predecessorId, successorId) DO UPDATE SET type = excluded.type, lag = excluded.lag`,
-    )
-    .run(id, input.projectId, input.predecessorId, input.successorId, input.type ?? "FS", input.lag ?? 0);
-  return (
-    (getDb()
-      .prepare("SELECT * FROM dependencies WHERE predecessorId = ? AND successorId = ?")
-      .get(input.predecessorId, input.successorId) as Dependency) ?? null
+  await run(
+    `INSERT INTO dependencies (id, projectId, predecessorId, successorId, type, lag)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(predecessorId, successorId) DO UPDATE SET type = excluded.type, lag = excluded.lag`,
+    newId(),
+    input.projectId,
+    input.predecessorId,
+    input.successorId,
+    input.type ?? "FS",
+    input.lag ?? 0,
+  );
+  return get<Dependency>(
+    "SELECT * FROM dependencies WHERE predecessorId = ? AND successorId = ?",
+    input.predecessorId,
+    input.successorId,
   );
 }
 
-export function deleteDependency(id: string) {
-  getDb().prepare("DELETE FROM dependencies WHERE id = ?").run(id);
+export async function getDependency(id: string): Promise<Dependency | null> {
+  return get<Dependency>("SELECT * FROM dependencies WHERE id = ?", id);
+}
+
+export async function deleteDependency(id: string) {
+  await run("DELETE FROM dependencies WHERE id = ?", id);
 }
 
 // --- Resources & assignments ----------------------------------------------
 
-export function listResources(projectId: string): Resource[] {
-  return getDb().prepare("SELECT * FROM resources WHERE projectId = ? ORDER BY name").all(projectId) as Resource[];
+export async function listResources(projectId: string): Promise<Resource[]> {
+  return all<Resource>("SELECT * FROM resources WHERE projectId = ? ORDER BY name", projectId);
 }
 
-export function createResource(input: {
+export async function createResource(input: {
   projectId: string;
   name: string;
   email?: string | null;
   role?: string | null;
   dayRate?: number;
-}): Resource {
+}): Promise<Resource> {
   const id = newId();
-  getDb()
-    .prepare("INSERT INTO resources (id, projectId, name, email, role, dayRate) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(id, input.projectId, input.name, input.email ?? null, input.role ?? null, input.dayRate ?? 0);
-  return getDb().prepare("SELECT * FROM resources WHERE id = ?").get(id) as Resource;
+  await run(
+    "INSERT INTO resources (id, projectId, name, email, role, dayRate) VALUES (?, ?, ?, ?, ?, ?)",
+    id,
+    input.projectId,
+    input.name,
+    input.email ?? null,
+    input.role ?? null,
+    input.dayRate ?? 0,
+  );
+  return (await get<Resource>("SELECT * FROM resources WHERE id = ?", id))!;
 }
 
-export function updateResource(id: string, patch: Partial<Resource>): Resource | null {
-  const cur = getDb().prepare("SELECT * FROM resources WHERE id = ?").get(id) as Resource | undefined;
+export async function getResource(id: string): Promise<Resource | null> {
+  return get<Resource>("SELECT * FROM resources WHERE id = ?", id);
+}
+
+export async function updateResource(id: string, patch: Partial<Resource>): Promise<Resource | null> {
+  const cur = await get<Resource>("SELECT * FROM resources WHERE id = ?", id);
   if (!cur) return null;
   const m = { ...cur, ...patch };
-  getDb()
-    .prepare("UPDATE resources SET name = ?, email = ?, role = ?, dayRate = ? WHERE id = ?")
-    .run(m.name, m.email, m.role, m.dayRate, id);
-  return getDb().prepare("SELECT * FROM resources WHERE id = ?").get(id) as Resource;
+  await run(
+    "UPDATE resources SET name = ?, email = ?, role = ?, dayRate = ? WHERE id = ?",
+    m.name,
+    m.email,
+    m.role,
+    m.dayRate,
+    id,
+  );
+  return get<Resource>("SELECT * FROM resources WHERE id = ?", id);
 }
 
-export function deleteResource(id: string) {
-  getDb().prepare("DELETE FROM resources WHERE id = ?").run(id);
+export async function deleteResource(id: string) {
+  await run("DELETE FROM resources WHERE id = ?", id);
 }
 
-export function listAssignments(projectId: string): Assignment[] {
-  return getDb()
-    .prepare(
-      `SELECT a.* FROM assignments a JOIN tasks t ON t.id = a.taskId WHERE t.projectId = ?`,
-    )
-    .all(projectId) as Assignment[];
+export async function listAssignments(projectId: string): Promise<Assignment[]> {
+  return all<Assignment>(
+    `SELECT a.* FROM assignments a JOIN tasks t ON t.id = a.taskId WHERE t.projectId = ?`,
+    projectId,
+  );
 }
 
-export function setTaskAssignments(taskId: string, resourceIds: string[]) {
-  const d = getDb();
-  const tx = d.transaction(() => {
-    d.prepare("DELETE FROM assignments WHERE taskId = ?").run(taskId);
-    const stmt = d.prepare("INSERT INTO assignments (id, taskId, resourceId, units) VALUES (?, ?, ?, 100)");
-    for (const rid of resourceIds) stmt.run(newId(), taskId, rid);
-  });
-  tx();
+export async function setTaskAssignments(taskId: string, resourceIds: string[]) {
+  await transaction([
+    { sql: "DELETE FROM assignments WHERE taskId = ?", args: [taskId] },
+    ...resourceIds.map((rid) => ({
+      sql: "INSERT INTO assignments (id, taskId, resourceId, units) VALUES (?, ?, ?, 100)",
+      args: [newId(), taskId, rid],
+    })),
+  ]);
 }
 
 // --- Email action tokens ---------------------------------------------------
@@ -493,141 +560,182 @@ export interface UpdateToken {
   createdAt: string;
 }
 
-export function createUpdateToken(input: {
+export async function createUpdateToken(input: {
   projectId: string;
   taskId?: string | null;
   recipientEmail: string;
   action: string;
   payload?: string | null;
   ttlDays?: number;
-}): UpdateToken {
+}): Promise<UpdateToken> {
   const token = randomUUID().replace(/-/g, "");
   const expires = new Date(Date.now() + (input.ttlDays ?? 14) * 86_400_000).toISOString();
-  getDb()
-    .prepare(
-      `INSERT INTO update_tokens (token, projectId, taskId, recipientEmail, action, payload, expiresAt, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      token,
-      input.projectId,
-      input.taskId ?? null,
-      input.recipientEmail,
-      input.action,
-      input.payload ?? null,
-      expires,
-      now(),
-    );
-  return getUpdateToken(token)!;
+  await run(
+    `INSERT INTO update_tokens (token, projectId, taskId, recipientEmail, action, payload, expiresAt, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    token,
+    input.projectId,
+    input.taskId ?? null,
+    input.recipientEmail,
+    input.action,
+    input.payload ?? null,
+    expires,
+    now(),
+  );
+  return (await getUpdateToken(token))!;
 }
 
-export function getUpdateToken(token: string): UpdateToken | null {
-  return (getDb().prepare("SELECT * FROM update_tokens WHERE token = ?").get(token) as UpdateToken) ?? null;
+export async function getUpdateToken(token: string): Promise<UpdateToken | null> {
+  return get<UpdateToken>("SELECT * FROM update_tokens WHERE token = ?", token);
 }
 
-export function consumeUpdateToken(token: string) {
-  getDb().prepare("UPDATE update_tokens SET usedAt = ? WHERE token = ?").run(now(), token);
+export async function consumeUpdateToken(token: string) {
+  await run("UPDATE update_tokens SET usedAt = ? WHERE token = ?", now(), token);
 }
 
 // --- Share links -----------------------------------------------------------
 
-export function listShareLinks(projectId: string): ShareLink[] {
-  return getDb()
-    .prepare("SELECT * FROM share_links WHERE projectId = ? AND revokedAt IS NULL ORDER BY createdAt DESC")
-    .all(projectId) as ShareLink[];
-}
-
-export function createShareLink(projectId: string, label?: string | null): ShareLink {
-  const token = randomUUID().replace(/-/g, "");
-  getDb()
-    .prepare("INSERT INTO share_links (token, projectId, label, createdAt) VALUES (?, ?, ?, ?)")
-    .run(token, projectId, label ?? null, now());
-  return getDb().prepare("SELECT * FROM share_links WHERE token = ?").get(token) as ShareLink;
-}
-
-/** Returns the link only if it exists and has not been revoked. */
-export function getActiveShareLink(token: string): ShareLink | null {
-  return (
-    (getDb()
-      .prepare("SELECT * FROM share_links WHERE token = ? AND revokedAt IS NULL")
-      .get(token) as ShareLink) ?? null
+export async function listShareLinks(projectId: string): Promise<ShareLink[]> {
+  return all<ShareLink>(
+    "SELECT * FROM share_links WHERE projectId = ? AND revokedAt IS NULL ORDER BY createdAt DESC",
+    projectId,
   );
 }
 
-export function revokeShareLink(token: string) {
-  getDb().prepare("UPDATE share_links SET revokedAt = ? WHERE token = ?").run(now(), token);
+async function getShareLink(token: string): Promise<ShareLink | null> {
+  return get<ShareLink>("SELECT * FROM share_links WHERE token = ?", token);
+}
+
+export async function createShareLink(projectId: string, label?: string | null): Promise<ShareLink> {
+  const token = randomUUID().replace(/-/g, "");
+  await run(
+    "INSERT INTO share_links (token, projectId, label, createdAt) VALUES (?, ?, ?, ?)",
+    token,
+    projectId,
+    label ?? null,
+    now(),
+  );
+  return (await getShareLink(token))!;
+}
+
+/**
+ * A personal read-only link for one stakeholder. Re-inviting the same address
+ * reuses their active link, so the link in an older email keeps working.
+ */
+export async function createInvite(projectId: string, email: string, message?: string | null): Promise<ShareLink> {
+  const existing = await get<ShareLink>(
+    "SELECT * FROM share_links WHERE projectId = ? AND email = ? AND revokedAt IS NULL",
+    projectId,
+    email,
+  );
+  if (existing) {
+    await run("UPDATE share_links SET message = ? WHERE token = ?", message ?? null, existing.token);
+    return (await getShareLink(existing.token))!;
+  }
+  const token = randomUUID().replace(/-/g, "");
+  await run(
+    "INSERT INTO share_links (token, projectId, label, email, message, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+    token,
+    projectId,
+    email,
+    email,
+    message ?? null,
+    now(),
+  );
+  return (await getShareLink(token))!;
+}
+
+/** Returns the link only if it exists and has not been revoked. */
+export async function getActiveShareLink(token: string): Promise<ShareLink | null> {
+  return get<ShareLink>("SELECT * FROM share_links WHERE token = ? AND revokedAt IS NULL", token);
+}
+
+export async function markInviteSent(token: string) {
+  await run("UPDATE share_links SET lastSentAt = ? WHERE token = ?", now(), token);
+}
+
+/** Counts visits, not page loads: refreshes within 30 minutes of the last view don't add one. */
+export async function markShareViewed(token: string) {
+  const visitGap = new Date(Date.now() - 30 * 60_000).toISOString();
+  await run(
+    `UPDATE share_links
+       SET viewCount = COALESCE(viewCount, 0) + CASE WHEN lastViewedAt IS NULL OR lastViewedAt < ? THEN 1 ELSE 0 END,
+           lastViewedAt = ?
+     WHERE token = ?`,
+    visitGap,
+    now(),
+    token,
+  );
+}
+
+export async function revokeShareLink(token: string) {
+  await run("UPDATE share_links SET revokedAt = ? WHERE token = ?", now(), token);
 }
 
 // --- Automation rules ------------------------------------------------------
 
-export function listAutomations(projectId: string): AutomationRule[] {
-  return getDb()
-    .prepare("SELECT * FROM automation_rules WHERE projectId = ? ORDER BY createdAt")
-    .all(projectId) as AutomationRule[];
+export async function listAutomations(projectId: string): Promise<AutomationRule[]> {
+  return all<AutomationRule>("SELECT * FROM automation_rules WHERE projectId = ? ORDER BY createdAt", projectId);
 }
 
-export function listEnabledAutomations(): AutomationRule[] {
-  return getDb().prepare("SELECT * FROM automation_rules WHERE enabled = 1").all() as AutomationRule[];
+export async function listEnabledAutomations(): Promise<AutomationRule[]> {
+  return all<AutomationRule>("SELECT * FROM automation_rules WHERE enabled = 1");
 }
 
-export function getAutomation(id: string): AutomationRule | null {
-  return (getDb().prepare("SELECT * FROM automation_rules WHERE id = ?").get(id) as AutomationRule) ?? null;
+export async function getAutomation(id: string): Promise<AutomationRule | null> {
+  return get<AutomationRule>("SELECT * FROM automation_rules WHERE id = ?", id);
 }
 
-export function createAutomation(input: Omit<AutomationRule, "id" | "createdAt" | "lastRunAt">): AutomationRule {
+export async function createAutomation(
+  input: Omit<AutomationRule, "id" | "createdAt" | "lastRunAt">,
+): Promise<AutomationRule> {
   const id = newId();
-  getDb()
-    .prepare(
-      `INSERT INTO automation_rules
-         (id, projectId, name, trigger, triggerDays, triggerStatus, action, actionEmails,
-          includeButtons, enabled, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      id,
-      input.projectId,
-      input.name,
-      input.trigger,
-      input.triggerDays,
-      input.triggerStatus,
-      input.action,
-      input.actionEmails,
-      input.includeButtons,
-      input.enabled,
-      now(),
-    );
-  return getAutomation(id)!;
+  await run(
+    `INSERT INTO automation_rules
+       (id, projectId, name, trigger, triggerDays, triggerStatus, action, actionEmails,
+        includeButtons, enabled, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    input.projectId,
+    input.name,
+    input.trigger,
+    input.triggerDays,
+    input.triggerStatus,
+    input.action,
+    input.actionEmails,
+    input.includeButtons,
+    input.enabled,
+    now(),
+  );
+  return (await getAutomation(id))!;
 }
 
-export function updateAutomation(id: string, patch: Partial<AutomationRule>): AutomationRule | null {
-  const cur = getAutomation(id);
+export async function updateAutomation(id: string, patch: Partial<AutomationRule>): Promise<AutomationRule | null> {
+  const cur = await getAutomation(id);
   if (!cur) return null;
   const m = { ...cur, ...patch };
-  getDb()
-    .prepare(
-      `UPDATE automation_rules SET name = ?, trigger = ?, triggerDays = ?, triggerStatus = ?,
-        action = ?, actionEmails = ?, includeButtons = ?, enabled = ? WHERE id = ?`,
-    )
-    .run(
-      m.name,
-      m.trigger,
-      m.triggerDays,
-      m.triggerStatus,
-      m.action,
-      m.actionEmails,
-      m.includeButtons,
-      m.enabled,
-      id,
-    );
+  await run(
+    `UPDATE automation_rules SET name = ?, trigger = ?, triggerDays = ?, triggerStatus = ?,
+      action = ?, actionEmails = ?, includeButtons = ?, enabled = ? WHERE id = ?`,
+    m.name,
+    m.trigger,
+    m.triggerDays,
+    m.triggerStatus,
+    m.action,
+    m.actionEmails,
+    m.includeButtons,
+    m.enabled,
+    id,
+  );
   return getAutomation(id);
 }
 
-export function deleteAutomation(id: string) {
-  getDb().prepare("DELETE FROM automation_rules WHERE id = ?").run(id);
+export async function deleteAutomation(id: string) {
+  await run("DELETE FROM automation_rules WHERE id = ?", id);
 }
 
-export function markAutomationRun(id: string) {
-  getDb().prepare("UPDATE automation_rules SET lastRunAt = ? WHERE id = ?").run(now(), id);
+export async function markAutomationRun(id: string) {
+  await run("UPDATE automation_rules SET lastRunAt = ? WHERE id = ?", now(), id);
 }
 
 /**
@@ -635,20 +743,24 @@ export function markAutomationRun(id: string) {
  * already had — the caller skips the send, so a rule running hourly does not
  * spam people.
  */
-export function claimAutomationSend(
+export async function claimAutomationSend(
   ruleId: string,
   taskId: string | null,
   recipient: string,
   onDate: string,
-): boolean {
+): Promise<boolean> {
   try {
-    getDb()
-      .prepare(
-        "INSERT INTO automation_log (id, ruleId, taskId, recipient, onDate, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
-      )
+    await run(
+      "INSERT INTO automation_log (id, ruleId, taskId, recipient, onDate, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+      newId(),
+      ruleId,
       // SQLite treats NULLs as distinct in a UNIQUE index, so project-level
       // sends use "" rather than null to make the constraint actually bite.
-      .run(newId(), ruleId, taskId ?? "", recipient, onDate, now());
+      taskId ?? "",
+      recipient,
+      onDate,
+      now(),
+    );
     return true;
   } catch {
     return false;
@@ -666,19 +778,22 @@ export interface ActivityEntry {
   createdAt: string;
 }
 
-export function logActivity(input: {
-  projectId: string;
-  taskId?: string | null;
-  actor: string;
-  message: string;
-}) {
-  getDb()
-    .prepare("INSERT INTO activity (id, projectId, taskId, actor, message, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(newId(), input.projectId, input.taskId ?? null, input.actor, input.message, now());
+export async function logActivity(input: { projectId: string; taskId?: string | null; actor: string; message: string }) {
+  await run(
+    "INSERT INTO activity (id, projectId, taskId, actor, message, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+    newId(),
+    input.projectId,
+    input.taskId ?? null,
+    input.actor,
+    input.message,
+    now(),
+  );
 }
 
-export function listActivity(projectId: string, limit = 50): ActivityEntry[] {
-  return getDb()
-    .prepare("SELECT * FROM activity WHERE projectId = ? ORDER BY createdAt DESC LIMIT ?")
-    .all(projectId, limit) as ActivityEntry[];
+export async function listActivity(projectId: string, limit = 50): Promise<ActivityEntry[]> {
+  return all<ActivityEntry>(
+    "SELECT * FROM activity WHERE projectId = ? ORDER BY createdAt DESC LIMIT ?",
+    projectId,
+    limit,
+  );
 }

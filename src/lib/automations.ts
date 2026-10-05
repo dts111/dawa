@@ -84,7 +84,7 @@ export async function runRule(
   };
 
   if (!matched.length) {
-    if (!dryRun) markAutomationRun(rule.id);
+    if (!dryRun) await markAutomationRun(rule.id);
     return outcome;
   }
 
@@ -110,7 +110,7 @@ export async function runRule(
       // One email per person per day per rule, however often the rule runs.
       const fresh = dryRun
         ? person.tasks
-        : person.tasks.filter((t) => claimAutomationSend(rule.id, t.id, person.email, today));
+        : await claimEach(person.tasks, (t) => claimAutomationSend(rule.id, t.id, person.email, today));
       if (!fresh.length) {
         outcome.skipped += person.tasks.length;
         continue;
@@ -123,7 +123,7 @@ export async function runRule(
       }
 
       const message = rule.includeButtons
-        ? renderTaskUpdateRequest(bundle, person.name, person.email, fresh, today)
+        ? await renderTaskUpdateRequest(bundle, person.name, person.email, fresh, today)
         : renderRuleNotification(bundle, rule.name, headline, fresh, today);
       const res = await sendEmail(person.email, message.subject, message.html);
       if (res.sent) outcome.sent += 1;
@@ -137,7 +137,7 @@ export async function runRule(
     if (!addresses.length) outcome.errors.push("No email addresses set on this rule.");
 
     for (const to of addresses) {
-      if (!dryRun && !claimAutomationSend(rule.id, null, to, today)) {
+      if (!dryRun && !await claimAutomationSend(rule.id, null, to, today)) {
         outcome.skipped += 1;
         continue;
       }
@@ -154,9 +154,9 @@ export async function runRule(
   }
 
   if (!dryRun) {
-    markAutomationRun(rule.id);
+    await markAutomationRun(rule.id);
     if (outcome.sent > 0) {
-      logActivity({
+      await logActivity({
         projectId: rule.projectId,
         actor: "automation",
         message: `Rule "${rule.name}" matched ${outcome.matched} task(s) and emailed ${outcome.sent} recipient(s)`,
@@ -168,11 +168,11 @@ export async function runRule(
 
 /** Runs every enabled rule across every project. This is what the scheduler calls. */
 export async function runAllRules(today = todayISO()): Promise<RuleOutcome[]> {
-  const rules = listEnabledAutomations();
+  const rules = await listEnabledAutomations();
   const projectIds = new Set(rules.map((r) => r.projectId));
   const bundles = new Map<string, ProjectBundleData>();
   for (const id of projectIds) {
-    const b = loadProject(id);
+    const b = await loadProject(id);
     if (b) bundles.set(id, b);
   }
 
@@ -183,4 +183,11 @@ export async function runAllRules(today = todayISO()): Promise<RuleOutcome[]> {
     results.push(await runRule(rule, bundle, { today }));
   }
   return results;
+}
+
+/** Keeps the items whose claim succeeds, one at a time so the log stays consistent. */
+async function claimEach<T>(items: T[], claim: (item: T) => Promise<boolean>): Promise<T[]> {
+  const kept: T[] = [];
+  for (const item of items) if (await claim(item)) kept.push(item);
+  return kept;
 }

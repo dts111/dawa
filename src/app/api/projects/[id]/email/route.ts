@@ -16,7 +16,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, { params }: Ctx) {
   const { id } = await params;
-  const bundle = loadProject(id);
+  const bundle = await loadProject(id);
   if (!bundle) return NextResponse.json({ error: "Project not found." }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
@@ -64,14 +64,14 @@ export async function POST(req: Request, { params }: Ctx) {
         (t) => person.taskIds.has(t.id) && !t.isSummary && t.rolledPercentComplete < 100,
       );
       if (!tasks.length) continue;
-      const { subject, html } = renderTaskUpdateRequest(bundle, person.name, person.email, tasks, today);
+      const { subject, html } = await renderTaskUpdateRequest(bundle, person.name, person.email, tasks, today);
       if (preview) return NextResponse.json({ preview: true, subject, html, recipients: [person.email] });
       results.push(await sendEmail(person.email, subject, html));
     }
   }
 
   const sent = results.filter((r) => r.sent).length;
-  logActivity({
+  await logActivity({
     projectId: id,
     actor: "app",
     message: `${type === "digest" ? "Status digest" : "Task update request"} sent to ${sent} recipient(s)`,

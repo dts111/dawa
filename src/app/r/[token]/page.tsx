@@ -24,8 +24,8 @@ export default async function RespondPage({ params, searchParams }: Props) {
   const done = sp.done === "1" || sp.done === "0";
   const msg = typeof sp.msg === "string" ? sp.msg : "";
 
-  const record = getUpdateToken(token);
-  const task = record?.taskId ? getTask(record.taskId) : null;
+  const record = await getUpdateToken(token);
+  const task = record?.taskId ? await getTask(record.taskId) : null;
 
   if (done) {
     return (
@@ -35,7 +35,7 @@ export default async function RespondPage({ params, searchParams }: Props) {
         {record && (
           <Link
             href={`/project/${record.projectId}`}
-            className="mt-6 inline-block rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+            className="mt-6 inline-block rounded-md bg-brand px-4 py-2 text-sm font-medium text-white"
           >
             Open the plan
           </Link>
@@ -88,14 +88,14 @@ export default async function RespondPage({ params, searchParams }: Props) {
     );
   }
 
-  const result = applyResponse(token, choice);
+  const result = await applyResponse(token, choice);
   return (
     <Card>
       <h1 className="text-lg font-semibold text-slate-900">{result.ok ? "Update recorded" : "Sorry"}</h1>
       <p className="mt-3 text-sm text-slate-600">{result.message}</p>
       <Link
         href={`/project/${record.projectId}`}
-        className="mt-6 inline-block rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+        className="mt-6 inline-block rounded-md bg-brand px-4 py-2 text-sm font-medium text-white"
       >
         Open the plan
       </Link>

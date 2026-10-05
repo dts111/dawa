@@ -1,22 +1,23 @@
 import type { NextConfig } from "next";
 
+// Who may embed the app in an iframe: itself, localhost for development, and
+// the public address in APP_URL (whichever host it is deployed to).
+const frameAncestors = ["'self'", "http://localhost:*", "http://127.0.0.1:*"];
+try {
+  if (process.env.APP_URL) frameAncestors.push(new URL(process.env.APP_URL).origin);
+} catch {
+  // Ignore a malformed APP_URL rather than failing the build.
+}
+
 const nextConfig: NextConfig = {
-  // Minimal self-contained server bundle — needed for the Docker deploy on Fly.io.
-  output: "standalone",
-  // better-sqlite3 is a native addon — it must stay outside the bundler.
-  serverExternalPackages: ["better-sqlite3"],
+  // Self-contained server bundle for the Docker image (Fly.io). Render runs
+  // `next start` and Netlify uses its own Next.js adapter, so neither needs it.
+  ...(process.env.STANDALONE === "1" ? { output: "standalone" as const } : {}),
   async headers() {
     return [
       {
         source: "/(.*)",
-        headers: [
-          {
-            key: "Content-Security-Policy",
-            // localhost/127.0.0.1 for local dev, eaas-pm.fly.dev for the deployed app.
-            value:
-              "frame-ancestors 'self' http://localhost:* http://127.0.0.1:* https://eaas-pm.fly.dev",
-          },
-        ],
+        headers: [{ key: "Content-Security-Policy", value: `frame-ancestors ${frameAncestors.join(" ")}` }],
       },
     ];
   },

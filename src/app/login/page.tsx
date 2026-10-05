@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import BrandMark from "@/components/BrandMark";
 
 function LoginForm() {
   const router = useRouter();
@@ -31,12 +32,10 @@ function LoginForm() {
   };
 
   return (
-    <div className="w-full max-w-sm rounded-2xl bg-white p-7 shadow-xl shadow-slate-900/5 ring-1 ring-slate-200">
-      <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-base font-semibold text-white">
-        E
-      </div>
+    <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 shadow-float">
+      <BrandMark size={40} />
       <h1 className="mt-4 text-lg font-semibold text-slate-900">Sign in</h1>
-      <p className="mt-1 text-[13px] text-slate-500">Administrator access to EaaS Project Management.</p>
+      <p className="mt-1 text-[13px] text-slate-500">Administrator access to Dafegen Project Management.</p>
 
       <div className="mt-6 space-y-3.5">
         <label className="block">
@@ -46,7 +45,7 @@ function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && submit()}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10"
+            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-brand focus:ring-3 focus:ring-brand/15"
             autoFocus
           />
         </label>
@@ -57,14 +56,14 @@ function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && submit()}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10"
+            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-brand focus:ring-3 focus:ring-brand/15"
           />
         </label>
         <button
           type="button"
           onClick={submit}
           disabled={busy}
-          className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
+          className="w-full rounded-md border-2 border-brand bg-brand px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:border-brand-hover hover:bg-brand-hover disabled:opacity-50"
         >
           Sign in
         </button>
@@ -76,7 +75,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-slate-50 to-slate-200 px-6">
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-6">
       <Suspense>
         <LoginForm />
       </Suspense>

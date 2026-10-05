@@ -10,17 +10,49 @@ import CalendarView from "./CalendarView";
 import DashboardView from "./DashboardView";
 import SidePanel, { type Panel } from "./SidePanels";
 import LogoutButton from "./LogoutButton";
+import BrandMark from "./BrandMark";
+import {
+  ArrowDown,
+  ArrowUp,
+  Bookmark,
+  BookmarkX,
+  CalendarCog,
+  CalendarDays,
+  ChartGantt,
+  CircleAlert,
+  CornerDownRight,
+  Diamond,
+  Eye,
+  FileSpreadsheet,
+  IndentDecrease,
+  IndentIncrease,
+  LayoutDashboard,
+  Link2,
+  ListPlus,
+  LoaderCircle,
+  Mail,
+  Plus,
+  Share2,
+  Spline,
+  SquareKanban,
+  Table2,
+  Trash2,
+  Users,
+  X,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import type { ProjectBundleData, ScheduledTask, TaskStatus } from "@/lib/types";
 import { WorkCalendar, formatDate, todayISO } from "@/lib/calendar";
 
 export type ViewKey = "gantt" | "board" | "table" | "calendar" | "dashboard";
 
-const VIEWS: { key: ViewKey; label: string; icon: string }[] = [
-  { key: "gantt", label: "Gantt", icon: "▤" },
-  { key: "board", label: "Board", icon: "▦" },
-  { key: "table", label: "Table", icon: "☰" },
-  { key: "calendar", label: "Calendar", icon: "▩" },
-  { key: "dashboard", label: "Dashboard", icon: "◍" },
+const VIEWS: { key: ViewKey; label: string; icon: LucideIcon }[] = [
+  { key: "gantt", label: "Gantt", icon: ChartGantt },
+  { key: "board", label: "Board", icon: SquareKanban },
+  { key: "table", label: "Table", icon: Table2 },
+  { key: "calendar", label: "Calendar", icon: CalendarDays },
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
 ];
 
 const DEFAULT_COLUMN_WIDTHS: Record<ResizableCol, number> = { name: 224, start: 100, finish: 100 };
@@ -39,33 +71,47 @@ async function api(url: string, method: string, body?: unknown) {
 
 function Btn({
   children,
+  icon: Icon,
   onClick,
   disabled,
+  active,
   tone = "plain",
   title,
 }: {
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  icon?: LucideIcon;
   onClick?: () => void;
   disabled?: boolean;
+  active?: boolean;
   tone?: "plain" | "primary" | "danger";
   title?: string;
 }) {
   const tones = {
-    plain: "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50 hover:ring-slate-400",
-    primary: "bg-slate-900 text-white ring-slate-900 shadow-sm hover:bg-slate-800",
-    danger: "bg-white text-red-700 ring-red-300 hover:bg-red-50",
+    plain: active
+      ? "border-brand bg-brand-soft text-brand"
+      : "border-slate-200 bg-white text-slate-700 hover:border-brand hover:text-brand",
+    primary: "border-brand bg-brand text-white shadow-card hover:border-brand-hover hover:bg-brand-hover",
+    danger: "border-red-200 bg-white text-red-700 hover:border-red-400 hover:bg-red-50",
   } as const;
   return (
     <button
       type="button"
       title={title}
+      aria-label={!children ? title : undefined}
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-lg px-2.5 py-1.5 text-[13px] font-medium ring-1 ring-inset transition disabled:cursor-not-allowed disabled:opacity-40 ${tones[tone]}`}
+      className={`inline-flex items-center gap-1.5 rounded-md border-2 py-1 text-[13px] font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+        children ? "px-2.5" : "px-1.5"
+      } ${tones[tone]}`}
     >
+      {Icon && <Icon size={15} aria-hidden />}
       {children}
     </button>
   );
+}
+
+function Divider() {
+  return <span className="mx-1 h-5 w-px bg-slate-300" aria-hidden />;
 }
 
 /** The plan title, editable in place. Commits on blur/Enter, Escape reverts. */
@@ -100,7 +146,8 @@ function EditableHeading({
           (e.target as HTMLInputElement).blur();
         }
       }}
-      className="min-w-0 flex-1 truncate rounded-md border border-transparent bg-transparent px-1 -mx-1 text-base font-semibold tracking-tight text-slate-900 outline-none transition hover:border-slate-200 focus:border-slate-300 focus:bg-white focus:ring-2 focus:ring-slate-900/10 disabled:cursor-default disabled:hover:border-transparent"
+      size={Math.min(60, Math.max(8, draft.length + 1))}
+      className="max-w-full min-w-0 truncate rounded-md border border-transparent bg-transparent px-1 -mx-1 text-lg font-bold tracking-tight text-slate-900 outline-none transition hover:border-slate-200 focus:border-slate-300 focus:bg-white focus:ring-2 focus:ring-brand/15 disabled:cursor-default disabled:hover:border-transparent"
     />
   );
 }
@@ -109,10 +156,13 @@ export default function PlanWorkspace({
   initial,
   readOnly = false,
   shareLabel,
+  shareToken,
 }: {
   initial: ProjectBundleData;
   readOnly?: boolean;
   shareLabel?: string | null;
+  /** Share token when viewed through a read-only link; used for the Excel download. */
+  shareToken?: string;
 }) {
   const [bundle, setBundle] = useState(initial);
   const [view, setView] = useState<ViewKey>("gantt");
@@ -416,153 +466,219 @@ export default function PlanWorkspace({
 
   return (
     <div className="flex h-screen flex-col bg-slate-100">
-      <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <div className="mr-auto min-w-0">
-            <div className="flex items-center gap-2">
-              {!readOnly && (
-                <Link
-                  href="/"
-                  className="flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[13px] font-medium text-slate-600 transition hover:bg-slate-200 hover:text-slate-900"
-                  title="Back to main menu"
-                >
-                  ← Main menu
-                </Link>
-              )}
+      {readOnly && (
+        <div className="flex shrink-0 items-center justify-center gap-2 bg-teal px-4 py-1.5 text-[12.5px] text-white">
+          <Eye size={14} aria-hidden />
+          <span>
+            You&apos;re viewing a live, read-only plan{shareLabel ? ` · ${shareLabel}` : ""} — it updates as the
+            team works.
+          </span>
+        </div>
+      )}
+      <header className="shrink-0 border-b border-slate-200 bg-white shadow-card">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pt-3">
+          <div className="mr-auto flex min-w-0 items-center gap-3">
+            {readOnly ? (
+              <BrandMark />
+            ) : (
+              <Link href="/" title="All plans" aria-label="All plans" className="shrink-0">
+                <BrandMark />
+              </Link>
+            )}
+            <div className="min-w-0">
               <EditableHeading value={project.name} disabled={readOnly} onCommit={renameProject} />
-              {readOnly && (
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-slate-300">
-                  Read only{shareLabel ? ` · ${shareLabel}` : ""}
+              <p className="flex flex-wrap items-center gap-x-2 text-[12px] text-slate-500">
+                <span className="font-mono">
+                  {formatDate(schedule.projectStart)} → {formatDate(schedule.projectFinish)}
                 </span>
-              )}
+                <span aria-hidden>·</span>
+                <span className="font-mono">{schedule.totalDuration} working days</span>
+                <span aria-hidden>·</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-200">
+                    <span className="block h-full rounded-full bg-brand" style={{ width: `${overallPct}%` }} />
+                  </span>
+                  <span className="font-mono">{overallPct}%</span>
+                </span>
+                {overdue > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 font-medium text-red-700 ring-1 ring-red-200">
+                    <CircleAlert size={12} aria-hidden /> {overdue} overdue
+                  </span>
+                )}
+              </p>
             </div>
-            <p className="text-[12px] text-slate-500">
-              {formatDate(schedule.projectStart)} → {formatDate(schedule.projectFinish)} ·{" "}
-              {schedule.totalDuration} working days · {overallPct}% complete
-              {overdue > 0 && <span className="ml-2 font-semibold text-red-600">{overdue} overdue</span>}
-            </p>
           </div>
 
-          <div className="flex overflow-hidden rounded-lg ring-1 ring-slate-300 ring-inset">
-            {VIEWS.map((v) => (
-              <button
-                key={v.key}
-                type="button"
-                onClick={() => setView(v.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] transition ${
-                  view === v.key ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                <span aria-hidden>{v.icon}</span>
-                {v.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {!readOnly && (
+              <>
+                <Btn icon={Users} onClick={() => setPanel(panel === "team" ? null : "team")} active={panel === "team"}>
+                  Team
+                </Btn>
+                <Btn
+                  icon={Zap}
+                  onClick={() => setPanel(panel === "automations" ? null : "automations")}
+                  active={panel === "automations"}
+                >
+                  Automations
+                </Btn>
+                <Btn icon={Share2} onClick={() => setPanel(panel === "share" ? null : "share")} active={panel === "share"}>
+                  Share
+                </Btn>
+              </>
+            )}
+            <a
+              href={shareToken ? `/share/${shareToken}/xlsx` : `/api/projects/${project.id}/xlsx`}
+              className="inline-flex items-center gap-1.5 rounded-md border-2 border-teal/30 bg-teal-soft px-2.5 py-1 text-[13px] font-medium text-teal transition hover:border-teal"
+            >
+              <FileSpreadsheet size={15} aria-hidden />
+              Export to Excel
+            </a>
+            {!readOnly && (
+              <>
+                <Btn icon={Mail} tone="primary" onClick={() => setPanel(panel === "email" ? null : "email")}>
+                  Email update
+                </Btn>
+                <span className="mx-1 h-5 w-px bg-slate-200" />
+                <LogoutButton />
+              </>
+            )}
           </div>
+        </div>
 
-          {!readOnly && (
-            <>
-              <Btn onClick={() => setPanel(panel === "team" ? null : "team")}>Team</Btn>
-              <Btn onClick={() => setPanel(panel === "automations" ? null : "automations")}>Automations</Btn>
-              <Btn onClick={() => setPanel(panel === "share" ? null : "share")}>Share</Btn>
-            </>
-          )}
-          <a
-            href={`/api/projects/${project.id}/export/xlsx`}
-            className="rounded-lg bg-emerald-700 px-2.5 py-1.5 text-[13px] font-medium text-white shadow-sm transition hover:bg-emerald-800"
-          >
-            Export to Excel
-          </a>
-          {!readOnly && (
-            <Btn tone="primary" onClick={() => setPanel(panel === "email" ? null : "email")}>
-              Email update
-            </Btn>
-          )}
-          {!readOnly && (
-            <>
-              <span className="mx-1 h-5 w-px bg-slate-300" />
-              <LogoutButton />
-            </>
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-x-4 gap-y-2 px-4">
+          <nav className="-mb-px flex max-w-full gap-1 overflow-x-auto" aria-label="Views">
+            {VIEWS.map((v) => {
+              const Icon = v.icon;
+              const on = view === v.key;
+              return (
+                <button
+                  key={v.key}
+                  type="button"
+                  onClick={() => setView(v.key)}
+                  aria-current={on ? "page" : undefined}
+                  className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-[13.5px] font-medium transition ${
+                    on
+                      ? "border-brand text-brand"
+                      : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-900"
+                  }`}
+                >
+                  <Icon size={15} aria-hidden />
+                  {v.label}
+                </button>
+              );
+            })}
+          </nav>
+
+          {view === "gantt" && (
+            <div className="flex flex-wrap items-center gap-3 pb-2">
+              <div className="flex overflow-hidden rounded-md border-2 border-slate-200" role="group" aria-label="Zoom">
+                {(["day", "week", "month"] as Zoom[]).map((z) => (
+                  <button
+                    key={z}
+                    type="button"
+                    onClick={() => setZoom(z)}
+                    aria-pressed={zoom === z}
+                    className={`px-2.5 py-0.5 text-[12.5px] capitalize transition ${
+                      zoom === z ? "bg-brand text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {z}
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-1.5 text-[12.5px] text-slate-600">
+                <input
+                  type="checkbox"
+                  className="accent-brand"
+                  checked={showCritical}
+                  onChange={(e) => setShowCritical(e.target.checked)}
+                />
+                Critical path
+              </label>
+              <label className="flex items-center gap-1.5 text-[12.5px] text-slate-600">
+                <input
+                  type="checkbox"
+                  className="accent-brand"
+                  checked={showBaseline}
+                  onChange={(e) => setShowBaseline(e.target.checked)}
+                />
+                Baseline
+              </label>
+            </div>
           )}
         </div>
 
         {view === "gantt" && !readOnly && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <Btn onClick={() => addTask()}>+ Task</Btn>
-            <Btn onClick={() => addTask({ asChild: true })} disabled={!first}>
-              + Sub-task
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-200 bg-slate-50 px-4 py-2">
+            <Btn icon={Plus} onClick={() => addTask()}>
+              Task
             </Btn>
-            <Btn onClick={() => addTask({ above: true })} disabled={!first}>
-              + Task above
+            <Btn icon={CornerDownRight} onClick={() => addTask({ asChild: true })} disabled={!first}>
+              Sub-task
             </Btn>
-            <Btn onClick={() => addTask({ milestone: true })}>+ Milestone</Btn>
-            <span className="mx-1 h-5 w-px bg-slate-300" />
-            <Btn onClick={outdent} disabled={!first?.parentId} title="Move left">
-              ←
+            <Btn icon={ListPlus} onClick={() => addTask({ above: true })} disabled={!first}>
+              Task above
             </Btn>
-            <Btn onClick={indent} disabled={!first} title="Move right (make a sub-task)">
-              →
+            <Btn icon={Diamond} onClick={() => addTask({ milestone: true })}>
+              Milestone
             </Btn>
-            <Btn onClick={moveUp} disabled={!first} title="Move up">
-              ↑
-            </Btn>
-            <Btn onClick={moveDown} disabled={!first} title="Move down">
-              ↓
-            </Btn>
-            <span className="mx-1 h-5 w-px bg-slate-300" />
-            <Btn onClick={linkSelected} disabled={selected.length < 2} title="Link selected tasks finish-to-start">
+            <Divider />
+            <Btn icon={IndentDecrease} onClick={outdent} disabled={!first?.parentId} title="Outdent (move left)" />
+            <Btn icon={IndentIncrease} onClick={indent} disabled={!first} title="Indent (make a sub-task)" />
+            <Btn icon={ArrowUp} onClick={moveUp} disabled={!first} title="Move up" />
+            <Btn icon={ArrowDown} onClick={moveDown} disabled={!first} title="Move down" />
+            <Divider />
+            <Btn
+              icon={Link2}
+              onClick={linkSelected}
+              disabled={selected.length < 2}
+              title="Link selected tasks finish-to-start (Ctrl/Shift-click to select several)"
+            >
               Link
             </Btn>
-            <Btn onClick={() => setPanel("links")}>Manage links</Btn>
-            <Btn tone="danger" onClick={removeSelected} disabled={!selected.length}>
+            <Btn icon={Spline} onClick={() => setPanel("links")}>
+              Manage links
+            </Btn>
+            <Btn icon={Trash2} tone="danger" onClick={removeSelected} disabled={!selected.length}>
               Delete
             </Btn>
-            <span className="mx-1 h-5 w-px bg-slate-300" />
-            <Btn onClick={saveBaseline}>Save baseline</Btn>
+            <Divider />
+            <Btn icon={Bookmark} onClick={saveBaseline} title="Snapshot today's dates to measure slippage against">
+              Save baseline
+            </Btn>
             {hasBaseline && (
-              <Btn onClick={() => run(() => api(`/api/projects/${project.id}/baseline`, "DELETE"))}>
+              <Btn icon={BookmarkX} onClick={() => run(() => api(`/api/projects/${project.id}/baseline`, "DELETE"))}>
                 Clear baseline
               </Btn>
             )}
-            <Btn onClick={() => setPanel("settings")}>Working calendar</Btn>
-            {busy && <span className="ml-2 text-[12px] text-slate-400">Saving…</span>}
-          </div>
-        )}
-
-        {view === "gantt" && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <div className="flex overflow-hidden rounded-lg ring-1 ring-slate-300 ring-inset">
-              {(["day", "week", "month"] as Zoom[]).map((z) => (
-                <button
-                  key={z}
-                  type="button"
-                  onClick={() => setZoom(z)}
-                  className={`px-2.5 py-1.5 text-[13px] capitalize transition ${
-                    zoom === z ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  {z}
-                </button>
-              ))}
-            </div>
-            <label className="flex items-center gap-1.5 text-[13px] text-slate-600">
-              <input type="checkbox" checked={showCritical} onChange={(e) => setShowCritical(e.target.checked)} />
-              Critical path
-            </label>
-            <label className="flex items-center gap-1.5 text-[13px] text-slate-600">
-              <input type="checkbox" checked={showBaseline} onChange={(e) => setShowBaseline(e.target.checked)} />
-              Baseline
-            </label>
+            <Btn icon={CalendarCog} onClick={() => setPanel("settings")}>
+              Working calendar
+            </Btn>
+            {busy && (
+              <span className="ml-2 inline-flex items-center gap-1 text-[12px] text-slate-500">
+                <LoaderCircle size={13} className="animate-spin" aria-hidden /> Saving…
+              </span>
+            )}
           </div>
         )}
 
         {(error || notice || schedule.errors.length > 0) && (
-          <div className="mt-2 space-y-1">
+          <div className="space-y-1 px-4 pb-2">
             {error && (
-              <p className="rounded-md bg-red-50 px-3 py-1.5 text-[13px] text-red-700 ring-1 ring-red-200">{error}</p>
+              <p className="flex items-start gap-2 rounded-md bg-red-50 px-3 py-1.5 text-[13px] text-red-700 ring-1 ring-red-200">
+                <span className="flex-1">{error}</span>
+                <button type="button" onClick={() => setError(null)} aria-label="Dismiss" className="opacity-60 hover:opacity-100">
+                  <X size={14} />
+                </button>
+              </p>
             )}
             {notice && (
-              <p className="rounded-md bg-emerald-50 px-3 py-1.5 text-[13px] text-emerald-800 ring-1 ring-emerald-200">
-                {notice}
+              <p className="flex items-start gap-2 rounded-md bg-emerald-50 px-3 py-1.5 text-[13px] text-emerald-800 ring-1 ring-emerald-200">
+                <span className="flex-1">{notice}</span>
+                <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className="opacity-60 hover:opacity-100">
+                  <X size={14} />
+                </button>
               </p>
             )}
             {schedule.errors.map((e, i) => (

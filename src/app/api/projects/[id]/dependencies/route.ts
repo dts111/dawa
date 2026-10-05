@@ -10,7 +10,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Ctx) {
   const { id } = await params;
-  return NextResponse.json({ dependencies: listDependencies(id) });
+  return NextResponse.json({ dependencies: await listDependencies(id) });
 }
 
 export async function POST(req: Request, { params }: Ctx) {
@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: Ctx) {
     return NextResponse.json({ error: "Pick two different tasks to link." }, { status: 400 });
   }
 
-  const dep = createDependency({
+  const dep = await createDependency({
     projectId: id,
     predecessorId,
     successorId,
@@ -31,13 +31,13 @@ export async function POST(req: Request, { params }: Ctx) {
   });
 
   // Reject the link if it just created a loop, rather than leaving the plan broken.
-  const project = getProject(id);
+  const project = await getProject(id);
   if (project) {
-    const check = scheduleProject(project, listTasks(id), listDependencies(id));
+    const check = scheduleProject(project, await listTasks(id), await listDependencies(id));
     if (check.errors.some((e) => e.startsWith("Circular"))) {
       if (dep) {
         const { deleteDependency } = await import("@/lib/db");
-        deleteDependency(dep.id);
+        await deleteDependency(dep.id);
       }
       return NextResponse.json(
         { error: "That link would create a circular dependency, so it was not added." },
@@ -46,5 +46,5 @@ export async function POST(req: Request, { params }: Ctx) {
     }
   }
 
-  return NextResponse.json({ dependency: dep, bundle: loadProject(id) }, { status: 201 });
+  return NextResponse.json({ dependency: dep, bundle: await loadProject(id) }, { status: 201 });
 }

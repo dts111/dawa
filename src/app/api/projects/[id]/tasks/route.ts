@@ -8,7 +8,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Ctx) {
   const { id } = await params;
-  return NextResponse.json({ tasks: listTasks(id) });
+  return NextResponse.json({ tasks: await listTasks(id) });
 }
 
 export async function POST(req: Request, { params }: Ctx) {
@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: Ctx) {
   // Insert directly beneath a given row when the UI asks for it.
   let sortOrder: number | undefined = body.sortOrder;
   if (sortOrder === undefined && body.afterTaskId) {
-    const tasks = listTasks(id).sort((a, b) => a.sortOrder - b.sortOrder);
+    const tasks = (await listTasks(id)).sort((a, b) => a.sortOrder - b.sortOrder);
     const idx = tasks.findIndex((t) => t.id === body.afterTaskId);
     if (idx >= 0) {
       const before = tasks[idx].sortOrder;
@@ -31,7 +31,7 @@ export async function POST(req: Request, { params }: Ctx) {
   // Or directly above a given row — scoped to true siblings, so it slots in
   // regardless of what else exists elsewhere in the project.
   if (sortOrder === undefined && body.beforeTaskId) {
-    const tasks = listTasks(id);
+    const tasks = await listTasks(id);
     const target = tasks.find((t) => t.id === body.beforeTaskId);
     if (target) {
       const siblings = tasks.filter((t) => t.parentId === target.parentId).sort((a, b) => a.sortOrder - b.sortOrder);
@@ -41,7 +41,7 @@ export async function POST(req: Request, { params }: Ctx) {
     }
   }
 
-  const task = createTask({
+  const task = await createTask({
     projectId: id,
     name,
     parentId: body.parentId ?? null,
@@ -50,6 +50,6 @@ export async function POST(req: Request, { params }: Ctx) {
     percentComplete: body.percentComplete ?? 0,
     notes: body.notes ?? null,
   });
-  logActivity({ projectId: id, taskId: task.id, actor: "app", message: `Task "${task.name}" added` });
-  return NextResponse.json({ task, bundle: loadProject(id) }, { status: 201 });
+  await logActivity({ projectId: id, taskId: task.id, actor: "app", message: `Task "${task.name}" added` });
+  return NextResponse.json({ task, bundle: await loadProject(id) }, { status: 201 });
 }

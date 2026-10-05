@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
 import { describeRule } from "@/lib/ruleText";
+import { formatDate } from "@/lib/calendar";
 import { STATUS_ORDER, STATUS_TOKENS } from "./statusTokens";
 import type {
   AutomationRule,
@@ -33,7 +35,7 @@ interface Props {
 }
 
 const input =
-  "w-full rounded-lg border border-slate-300 px-2 py-1.5 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10";
+  "w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 outline-none transition focus:border-brand focus:ring-3 focus:ring-brand/15";
 
 export default function SidePanel({
   panel,
@@ -80,9 +82,10 @@ export default function SidePanel({
         <button
           type="button"
           onClick={onClose}
+          aria-label="Close panel"
           className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
         >
-          ✕
+          <X size={16} />
         </button>
       </div>
 
@@ -144,10 +147,10 @@ export default function SidePanel({
                   onChange={(e) => setRate(e.target.value)}
                   placeholder="Day rate"
                   type="number"
-                  className="w-28 rounded-lg border border-slate-300 px-2 py-1.5 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10"
+                  className="w-28 rounded-lg border border-slate-300 px-2 py-1.5 outline-none transition focus:border-brand focus:ring-3 focus:ring-brand/15"
                 />
               </div>
-              <button type="submit" className="w-full rounded-lg bg-slate-900 px-3 py-1.5 font-medium text-white shadow-sm transition hover:bg-slate-800">
+              <button type="submit" className="w-full rounded-lg bg-brand px-3 py-1.5 font-medium text-white shadow-sm transition hover:bg-brand-hover">
                 Add
               </button>
             </form>
@@ -268,7 +271,7 @@ export default function SidePanel({
                         : "Email is in preview mode — add RESEND_API_KEY to .env.local to send for real.",
                     );
                 }}
-                className="rounded-lg bg-slate-900 px-2.5 py-1.5 font-medium text-white shadow-sm transition hover:bg-slate-800"
+                className="rounded-lg bg-brand px-2.5 py-1.5 font-medium text-white shadow-sm transition hover:bg-brand-hover"
               >
                 Send task requests
               </button>
@@ -283,7 +286,7 @@ export default function SidePanel({
                         : "Email is in preview mode — add RESEND_API_KEY to .env.local to send for real.",
                     );
                 }}
-                className="rounded-lg bg-slate-900 px-2.5 py-1.5 font-medium text-white shadow-sm transition hover:bg-slate-800"
+                className="rounded-lg bg-brand px-2.5 py-1.5 font-medium text-white shadow-sm transition hover:bg-brand-hover"
               >
                 Send status digest
               </button>
@@ -304,6 +307,8 @@ export default function SidePanel({
 
 // ------------------------------------------------------------------ Share ---
 
+const when = (iso: string | null) => (iso ? formatDate(iso.slice(0, 10)) : "");
+
 function SharePanel({
   bundle,
   call,
@@ -313,85 +318,218 @@ function SharePanel({
   call: (url: string, method: string, body?: unknown) => Promise<Record<string, unknown> | null>;
   onNotice: (m: string | null) => void;
 }) {
+  const [emails, setEmails] = useState("");
+  const [message, setMessage] = useState("");
   const [label, setLabel] = useState("");
+  const [sending, setSending] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
   // This panel only ever renders after a click, so the browser is present and
   // there is no server-rendered markup to mismatch against.
   const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const projectId = bundle.project.id;
+
+  const invites = bundle.shareLinks.filter((l) => l.email);
+  const anonymous = bundle.shareLinks.filter((l) => !l.email);
+
+  const report = (r: Record<string, unknown> | null, count: number) => {
+    if (!r) return;
+    const sent = Number(r.sent ?? 0);
+    setPreview((r.previewHtml as string | null) ?? null);
+    onNotice(
+      sent === count
+        ? `View-only invite emailed to ${count === 1 ? "1 person" : `${count} people`}.`
+        : sent > 0
+          ? `Invites emailed to ${sent} of ${count}. Check the email settings for the rest.`
+          : "Access created, but email is in preview mode — add RESEND_API_KEY to send invites. Meanwhile you can copy each person's link below.",
+    );
+  };
+
+  const sendInvites = async () => {
+    const list = emails
+      .split(/[\s,;]+/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+    if (!list.length) return;
+    setSending(true);
+    const r = await call(`/api/projects/${projectId}/share/invite`, "POST", { emails: list, message });
+    setSending(false);
+    if (r) {
+      setEmails("");
+      setMessage("");
+      report(r, new Set(list.map((e) => e.toLowerCase())).size);
+    }
+  };
+
+  const copy = (url: string) => {
+    navigator.clipboard?.writeText(url);
+    onNotice("Link copied to the clipboard.");
+  };
 
   return (
-    <div className="space-y-4">
-      <p className="text-slate-600">
-        A share link shows this plan to anyone who has it — Gantt, board, calendar and dashboard — but nothing
-        can be edited. Useful for the wider team and for clients before logins exist.
-      </p>
-      <p className="rounded-md bg-amber-50 px-2.5 py-1.5 text-[12px] text-amber-800 ring-1 ring-amber-200">
-        Anyone with the link can view the plan, including task names, dates and who is assigned. Share it the
-        way you would share a document link, and revoke it when it is no longer needed.
-      </p>
-
-      <div className="space-y-2 rounded-lg bg-slate-50 p-3">
-        <input
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="What is this link for? e.g. Client view"
+    <div className="space-y-5">
+      <section className="space-y-2.5">
+        <div>
+          <h3 className="font-semibold text-slate-900">Invite people to view</h3>
+          <p className="mt-0.5 text-slate-600">
+            Each person gets their own view-only link by email — Gantt, board, calendar and dashboard, always up
+            to date. No sign-in needed, and you can remove anyone&apos;s access at any time.
+          </p>
+        </div>
+        <textarea
+          value={emails}
+          onChange={(e) => setEmails(e.target.value)}
+          rows={2}
+          placeholder="client@company.com, investor@fund.com"
           className={input}
+          aria-label="Email addresses"
+        />
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={2}
+          placeholder="Add a message (optional)"
+          className={input}
+          aria-label="Message"
         />
         <button
           type="button"
-          onClick={async () => {
-            await call(`/api/projects/${bundle.project.id}/share`, "POST", { label: label || null });
-            setLabel("");
-            onNotice("Share link created.");
-          }}
-          className="w-full rounded-lg bg-slate-900 px-3 py-1.5 font-medium text-white shadow-sm transition hover:bg-slate-800"
+          disabled={sending || !emails.trim()}
+          onClick={sendInvites}
+          className="w-full rounded-lg bg-brand px-3 py-1.5 font-medium text-white shadow-sm transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Create a share link
+          {sending ? "Sending…" : "Send view-only invites"}
         </button>
-      </div>
+        {preview && (
+          <details className="rounded-lg border border-slate-200 p-2">
+            <summary className="cursor-pointer text-[12px] text-slate-600">Preview the invite email</summary>
+            <iframe
+              title="Invite preview"
+              srcDoc={preview}
+              className="mt-2 h-[420px] w-full rounded border border-slate-200"
+            />
+          </details>
+        )}
+      </section>
 
-      {bundle.shareLinks.length === 0 ? (
-        <p className="text-slate-400">No active links.</p>
-      ) : (
-        <ul className="space-y-2">
-          {bundle.shareLinks.map((l) => {
+      <section className="space-y-2">
+        <h3 className="font-semibold text-slate-900">
+          People with access <span className="font-normal text-slate-400">({invites.length})</span>
+        </h3>
+        {invites.length === 0 ? (
+          <p className="text-slate-400">Nobody has been invited yet.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+            {invites.map((l) => {
+              const url = `${origin}/share/${l.token}`;
+              return (
+                <li key={l.token} className="p-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate font-medium text-slate-800">{l.email}</p>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                        l.viewCount > 0 ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {l.viewCount > 0 ? `${l.viewCount} visit${l.viewCount === 1 ? "" : "s"}` : "Not opened yet"}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    {l.lastSentAt ? `Emailed ${when(l.lastSentAt)}` : `Added ${when(l.createdAt)} · not emailed`}
+                    {l.lastViewedAt && ` · last viewed ${when(l.lastViewedAt)}`}
+                  </p>
+                  <div className="mt-1.5 flex gap-3 text-[12px]">
+                    <button
+                      type="button"
+                      onClick={async () =>
+                        report(
+                          await call(`/api/projects/${projectId}/share/invite`, "POST", { resendToken: l.token }),
+                          1,
+                        )
+                      }
+                      className="text-brand hover:underline"
+                    >
+                      Resend
+                    </button>
+                    <button type="button" onClick={() => copy(url)} className="text-brand hover:underline">
+                      Copy link
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!window.confirm(`Remove ${l.email}'s access? Their link will stop working immediately.`))
+                          return;
+                        await call(`/api/projects/${projectId}/share?token=${l.token}`, "DELETE");
+                        onNotice(`Access removed for ${l.email}.`);
+                      }}
+                      className="ml-auto text-red-600 hover:underline"
+                    >
+                      Remove access
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <details className="rounded-lg border border-slate-200 p-3" open={anonymous.length > 0}>
+        <summary className="cursor-pointer font-semibold text-slate-900">Anonymous links</summary>
+        <div className="mt-2 space-y-2">
+          <p className="text-[12px] text-amber-800">
+            Anyone with one of these links can view the plan, and you can&apos;t see who opened it. Prefer personal
+            invites for stakeholders.
+          </p>
+          <div className="flex gap-2">
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="What is this link for?"
+              className={input}
+            />
+            <button
+              type="button"
+              onClick={async () => {
+                await call(`/api/projects/${projectId}/share`, "POST", { label: label || null });
+                setLabel("");
+                onNotice("Share link created.");
+              }}
+              className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-slate-300 ring-inset transition hover:bg-slate-50"
+            >
+              Create
+            </button>
+          </div>
+          {anonymous.map((l) => {
             const url = `${origin}/share/${l.token}`;
             return (
-              <li key={l.token} className="rounded-lg border border-slate-200 p-2.5">
+              <div key={l.token} className="rounded-lg bg-slate-50 p-2">
                 <p className="font-medium text-slate-800">{l.label || "Untitled link"}</p>
-                <code className="mt-1 block truncate rounded bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
-                  {url}
-                </code>
-                <div className="mt-2 flex gap-3 text-[12px]">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard?.writeText(url);
-                      onNotice("Link copied to the clipboard.");
-                    }}
-                    className="text-blue-700 hover:underline"
-                  >
+                <p className="text-[11px] text-slate-500">
+                  {l.viewCount > 0 ? `${l.viewCount} visit${l.viewCount === 1 ? "" : "s"} · last ${when(l.lastViewedAt)}` : "Not opened yet"}
+                </p>
+                <div className="mt-1 flex gap-3 text-[12px]">
+                  <button type="button" onClick={() => copy(url)} className="text-brand hover:underline">
                     Copy
                   </button>
-                  <a href={url} target="_blank" rel="noreferrer" className="text-blue-700 hover:underline">
+                  <a href={url} target="_blank" rel="noreferrer" className="text-brand hover:underline">
                     Open
                   </a>
                   <button
                     type="button"
-                    onClick={() => call(`/api/projects/${bundle.project.id}/share?token=${l.token}`, "DELETE")}
+                    onClick={() => call(`/api/projects/${projectId}/share?token=${l.token}`, "DELETE")}
                     className="ml-auto text-red-600 hover:underline"
                   >
                     Revoke
                   </button>
                 </div>
-              </li>
+              </div>
             );
           })}
-        </ul>
-      )}
+        </div>
+      </details>
 
       <p className="text-[12px] text-slate-500">
-        Links point at <code>APP_URL</code> when sent by email, so make sure that setting matches an address
-        your team can actually reach.
+        Emailed links point at <code>APP_URL</code>, so make sure it is the public address of this app.
       </p>
     </div>
   );
@@ -461,7 +599,7 @@ function AutomationsPanel({
               `Ran ${json.rules ?? 0} rule(s) — ${json.totalSent ?? 0} email(s) sent. Emails only actually leave if RESEND_API_KEY is set.`,
             );
           }}
-          className="rounded-lg bg-slate-900 px-2.5 py-1.5 font-medium text-white shadow-sm transition hover:bg-slate-800"
+          className="rounded-lg bg-brand px-2.5 py-1.5 font-medium text-white shadow-sm transition hover:bg-brand-hover"
         >
           Run all rules now
         </button>
@@ -557,7 +695,7 @@ function AutomationsPanel({
           </label>
         )}
 
-        <button type="button" onClick={create} className="w-full rounded-lg bg-slate-900 px-3 py-1.5 font-medium text-white shadow-sm transition hover:bg-slate-800">
+        <button type="button" onClick={create} className="w-full rounded-lg bg-brand px-3 py-1.5 font-medium text-white shadow-sm transition hover:bg-brand-hover">
           Create rule
         </button>
       </div>
@@ -608,7 +746,7 @@ function RuleRow({
               }.`,
             );
           }}
-          className="text-blue-700 hover:underline"
+          className="text-brand hover:underline"
         >
           Test
         </button>
@@ -619,7 +757,7 @@ function RuleRow({
             const o = r?.outcome as { matched: number; sent: number } | undefined;
             onNotice(`“${rule.name}” matched ${o?.matched ?? 0} task(s), sent ${o?.sent ?? 0} email(s).`);
           }}
-          className="text-blue-700 hover:underline"
+          className="text-brand hover:underline"
         >
           Run now
         </button>
@@ -674,7 +812,7 @@ function CalendarPanel({
               }
               className={`rounded px-2 py-1 text-[12px] ring-1 ring-inset ${
                 workingDays.includes(i)
-                  ? "bg-slate-900 text-white ring-slate-900"
+                  ? "bg-brand text-white ring-brand"
                   : "bg-white text-slate-600 ring-slate-300"
               }`}
             >
@@ -706,7 +844,7 @@ function CalendarPanel({
               .filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s)),
           })
         }
-        className="w-full rounded-lg bg-slate-900 px-3 py-1.5 font-medium text-white shadow-sm transition hover:bg-slate-800"
+        className="w-full rounded-lg bg-brand px-3 py-1.5 font-medium text-white shadow-sm transition hover:bg-brand-hover"
       >
         Save calendar
       </button>

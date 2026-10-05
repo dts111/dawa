@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import PlanWorkspace from "@/components/PlanWorkspace";
-import { getActiveShareLink, getProject } from "@/lib/db";
+import { getActiveShareLink, getProject, markShareViewed } from "@/lib/db";
 import { loadProject } from "@/lib/projectData";
 
 export const dynamic = "force-dynamic";
@@ -9,8 +9,8 @@ type Props = { params: Promise<{ token: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { token } = await params;
-  const link = getActiveShareLink(token);
-  const project = link ? getProject(link.projectId) : null;
+  const link = await getActiveShareLink(token);
+  const project = link ? await getProject(link.projectId) : null;
   return {
     title: project ? `${project.name} — plan` : "Plan not available",
     // A share link is unlisted, not public — keep it out of search results.
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function SharedPlanPage({ params }: Props) {
   const { token } = await params;
-  const link = getActiveShareLink(token);
+  const link = await getActiveShareLink(token);
 
   if (!link) {
     return (
@@ -35,7 +35,8 @@ export default async function SharedPlanPage({ params }: Props) {
     );
   }
 
-  const bundle = loadProject(link.projectId);
+  await markShareViewed(token);
+  const bundle = await loadProject(link.projectId);
   if (!bundle) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
@@ -53,7 +54,8 @@ export default async function SharedPlanPage({ params }: Props) {
     <PlanWorkspace
       initial={{ ...bundle, shareLinks: [], automations: [] }}
       readOnly
-      shareLabel={link.label}
+      shareLabel={link.email ? `Shared with ${link.email}` : link.label}
+      shareToken={token}
     />
   );
 }

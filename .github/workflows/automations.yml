@@ -1,0 +1,18 @@
+# Runs the automation rules every working morning, for free.
+# Set repository secrets APP_URL (e.g. https://your-app.netlify.app) and
+# AUTOMATION_SECRET (same value as the app's env var).
+name: Run automation rules
+on:
+  schedule:
+    - cron: "0 7 * * 1-5" # 07:00 UTC, Monday–Friday
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/automations/run
+        run: |
+          curl -fsS --retry 3 --retry-delay 30 --max-time 120 -X POST \
+            -H "x-automation-secret: ${{ secrets.AUTOMATION_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/automations/run"

@@ -15,20 +15,24 @@ import type { ProjectBundleData } from "./types";
 
 export type ProjectBundle = ProjectBundleData;
 
-export function loadProject(projectId: string): ProjectBundle | null {
-  const project = getProject(projectId);
+export async function loadProject(projectId: string): Promise<ProjectBundle | null> {
+  const project = await getProject(projectId);
   if (!project) return null;
-  const tasks = listTasks(projectId);
-  const dependencies = listDependencies(projectId);
-  const resources = listResources(projectId);
-  const assignments = listAssignments(projectId);
+  const [tasks, dependencies, resources, assignments, shareLinks, automations] = await Promise.all([
+    listTasks(projectId),
+    listDependencies(projectId),
+    listResources(projectId),
+    listAssignments(projectId),
+    listShareLinks(projectId),
+    listAutomations(projectId),
+  ]);
   return {
     project,
     dependencies,
     resources,
     assignments,
     schedule: scheduleProject(project, tasks, dependencies, resources, assignments),
-    shareLinks: listShareLinks(projectId),
-    automations: listAutomations(projectId),
+    shareLinks,
+    automations,
   };
 }

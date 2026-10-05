@@ -1,18 +1,16 @@
-# ---- deps: install with the toolchain better-sqlite3 needs to build its native binding ----
+# ---- deps ----
 FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 make g++ \
-    && npm ci \
-    && apt-get purge -y --auto-remove python3 make g++ \
-    && rm -rf /var/lib/apt/lists/*
+RUN npm ci
 
 # ---- builder ----
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Produce the self-contained .next/standalone server used below.
+ENV STANDALONE=1
 RUN npm run build
 
 # ---- runner: just the standalone server output, nothing else ----

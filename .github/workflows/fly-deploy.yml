@@ -1,11 +1,11 @@
 # See https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
+#
+# Manual only: the app now deploys to Netlify. Run this from the Actions tab
+# if you still want to push a build to Fly.io.
 
 name: Fly Deploy
 on:
-  push:
-    branches:
-      - main
-      - master
+  workflow_dispatch:
 jobs:
   deploy:
     name: Deploy app

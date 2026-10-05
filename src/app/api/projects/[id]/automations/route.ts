@@ -18,7 +18,7 @@ const ACTIONS: AutomationAction[] = ["email_owner", "email_addresses"];
 
 export async function GET(_req: Request, { params }: Ctx) {
   const { id } = await params;
-  return NextResponse.json({ automations: listAutomations(id) });
+  return NextResponse.json({ automations: await listAutomations(id) });
 }
 
 export async function POST(req: Request, { params }: Ctx) {
@@ -34,7 +34,7 @@ export async function POST(req: Request, { params }: Ctx) {
     return NextResponse.json({ error: "Add at least one email address." }, { status: 400 });
   }
 
-  const rule = createAutomation({
+  const rule = await createAutomation({
     projectId: id,
     name: String(body.name ?? "").trim() || "Untitled rule",
     trigger,
@@ -46,5 +46,5 @@ export async function POST(req: Request, { params }: Ctx) {
     enabled: body.enabled === false ? 0 : 1,
   });
 
-  return NextResponse.json({ rule, bundle: loadProject(id) }, { status: 201 });
+  return NextResponse.json({ rule, bundle: await loadProject(id) }, { status: 201 });
 }

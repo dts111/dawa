@@ -17,7 +17,7 @@ export const runtime = "nodejs";
  */
 export async function POST() {
   const start = addDays(todayISO(), -10);
-  const project = createProject({
+  const project = await createProject({
     name: "EaaS Deployment — Demo Site",
     description: "Example plan showing summaries, links, milestones, resources and a baseline.",
     startDate: start,
@@ -25,74 +25,76 @@ export async function POST() {
 
   // Placeholder addresses so the email previews work out of the box. Swap them
   // for real ones (or delete the demo project) before sending anything.
-  const team = [
+  const teamInput = [
     { name: "Project Manager", role: "Project Manager", dayRate: 550, email: "pm@example.com" },
     { name: "Site Engineer", role: "Engineering", dayRate: 420, email: "engineer@example.com" },
     { name: "Commercial Lead", role: "Commercial", dayRate: 480, email: "commercial@example.com" },
     { name: "Install Contractor", role: "Delivery", dayRate: 700, email: "contractor@example.com" },
-  ].map((r) => createResource({ projectId: project.id, ...r }));
+  ];
+  const team = [];
+  for (const r of teamInput) team.push(await createResource({ projectId: project.id, ...r }));
 
   let order = 0;
-  const t = (name: string, duration: number, parentId: string | null = null, pct = 0) =>
-    createTask({ projectId: project.id, name, duration, parentId, sortOrder: (order += 10), percentComplete: pct });
+  const t = async (name: string, duration: number, parentId: string | null = null, pct = 0) =>
+    await createTask({ projectId: project.id, name, duration, parentId, sortOrder: (order += 10), percentComplete: pct });
 
-  const phase1 = t("1. Feasibility & survey", 0);
-  const a1 = t("Site survey and load profiling", 5, phase1.id, 100);
-  const a2 = t("Energy modelling and options appraisal", 6, phase1.id, 100);
-  const a3 = t("Outline business case", 4, phase1.id, 60);
-  const m1 = t("Feasibility sign-off", 0, phase1.id);
+  const phase1 = await t("1. Feasibility & survey", 0);
+  const a1 = await t("Site survey and load profiling", 5, phase1.id, 100);
+  const a2 = await t("Energy modelling and options appraisal", 6, phase1.id, 100);
+  const a3 = await t("Outline business case", 4, phase1.id, 60);
+  const m1 = await t("Feasibility sign-off", 0, phase1.id);
 
-  const phase2 = t("2. Design & procurement", 0);
-  const b1 = t("Detailed design", 12, phase2.id, 20);
-  const b2 = t("Planning and DNO application", 20, phase2.id, 10);
-  const b3 = t("Tender pack and contractor selection", 10, phase2.id);
-  const b4 = t("Long-lead equipment order", 8, phase2.id);
-  const m2 = t("Contract award", 0, phase2.id);
+  const phase2 = await t("2. Design & procurement", 0);
+  const b1 = await t("Detailed design", 12, phase2.id, 20);
+  const b2 = await t("Planning and DNO application", 20, phase2.id, 10);
+  const b3 = await t("Tender pack and contractor selection", 10, phase2.id);
+  const b4 = await t("Long-lead equipment order", 8, phase2.id);
+  const m2 = await t("Contract award", 0, phase2.id);
 
-  const phase3 = t("3. Installation", 0);
-  const c1 = t("Enabling works", 6, phase3.id);
-  const c2 = t("Plant room installation", 15, phase3.id);
-  const c3 = t("Electrical and controls", 10, phase3.id);
-  const c4 = t("Commissioning and witness testing", 6, phase3.id);
+  const phase3 = await t("3. Installation", 0);
+  const c1 = await t("Enabling works", 6, phase3.id);
+  const c2 = await t("Plant room installation", 15, phase3.id);
+  const c3 = await t("Electrical and controls", 10, phase3.id);
+  const c4 = await t("Commissioning and witness testing", 6, phase3.id);
 
-  const phase4 = t("4. Handover & service", 0);
-  const d1 = t("O&M documentation and training", 5, phase4.id);
-  const d2 = t("Performance monitoring set-up", 4, phase4.id);
-  const m3 = t("Service go-live", 0, phase4.id);
+  const phase4 = await t("4. Handover & service", 0);
+  const d1 = await t("O&M documentation and training", 5, phase4.id);
+  const d2 = await t("Performance monitoring set-up", 4, phase4.id);
+  const m3 = await t("Service go-live", 0, phase4.id);
 
-  const link = (p: { id: string }, s: { id: string }, lag = 0) =>
-    createDependency({ projectId: project.id, predecessorId: p.id, successorId: s.id, type: "FS", lag });
+  const link = async (p: { id: string }, s: { id: string }, lag = 0) =>
+    await createDependency({ projectId: project.id, predecessorId: p.id, successorId: s.id, type: "FS", lag });
 
-  link(a1, a2);
-  link(a2, a3);
-  link(a3, m1);
-  link(m1, b1);
-  link(b1, b2);
-  link(b1, b3);
-  link(b3, m2);
-  link(m2, b4);
-  link(b4, c1, 5);
-  link(c1, c2);
-  link(c2, c3);
-  link(c3, c4);
-  link(c4, d1);
-  link(c4, d2);
-  link(d1, m3);
-  link(d2, m3);
+  await link(a1, a2);
+  await link(a2, a3);
+  await link(a3, m1);
+  await link(m1, b1);
+  await link(b1, b2);
+  await link(b1, b3);
+  await link(b3, m2);
+  await link(m2, b4);
+  await link(b4, c1, 5);
+  await link(c1, c2);
+  await link(c2, c3);
+  await link(c3, c4);
+  await link(c4, d1);
+  await link(c4, d2);
+  await link(d1, m3);
+  await link(d2, m3);
 
-  setTaskAssignments(a1.id, [team[1].id]);
-  setTaskAssignments(a2.id, [team[1].id]);
-  setTaskAssignments(a3.id, [team[0].id, team[2].id]);
-  setTaskAssignments(b1.id, [team[1].id]);
-  setTaskAssignments(b2.id, [team[0].id]);
-  setTaskAssignments(b3.id, [team[2].id]);
-  setTaskAssignments(c2.id, [team[3].id]);
-  setTaskAssignments(c3.id, [team[3].id]);
-  setTaskAssignments(c4.id, [team[1].id, team[3].id]);
-  setTaskAssignments(d1.id, [team[0].id]);
+  await setTaskAssignments(a1.id, [team[1].id]);
+  await setTaskAssignments(a2.id, [team[1].id]);
+  await setTaskAssignments(a3.id, [team[0].id, team[2].id]);
+  await setTaskAssignments(b1.id, [team[1].id]);
+  await setTaskAssignments(b2.id, [team[0].id]);
+  await setTaskAssignments(b3.id, [team[2].id]);
+  await setTaskAssignments(c2.id, [team[3].id]);
+  await setTaskAssignments(c3.id, [team[3].id]);
+  await setTaskAssignments(c4.id, [team[1].id, team[3].id]);
+  await setTaskAssignments(d1.id, [team[0].id]);
 
   // One blocked item so the board and dashboard show something interesting.
-  updateTask(b2.id, { status: "blocked" });
+  await updateTask(b2.id, { status: "blocked" });
 
   return NextResponse.json({ projectId: project.id }, { status: 201 });
 }

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Plus } from "lucide-react";
 
 export default function NewProjectForm() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function NewProjectForm() {
   };
 
   return (
-    <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-card">
       <div className="flex flex-wrap items-end gap-3">
         <label className="min-w-56 flex-1">
           <span className="text-[12px] font-semibold text-slate-700">New plan name</span>
@@ -39,7 +40,7 @@ export default function NewProjectForm() {
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && create()}
             placeholder="e.g. Site 12 EaaS rollout"
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10"
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand focus:ring-3 focus:ring-brand/15"
           />
         </label>
         <label>
@@ -48,15 +49,16 @@ export default function NewProjectForm() {
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10"
+            className="mt-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand focus:ring-3 focus:ring-brand/15"
           />
         </label>
         <button
           type="button"
           onClick={create}
           disabled={busy}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-md border-2 border-brand bg-brand px-4 py-1.5 text-sm font-semibold text-white shadow-card hover:border-brand-hover transition hover:bg-brand-hover disabled:opacity-50"
         >
+          <Plus size={16} aria-hidden />
           Create plan
         </button>
       </div>

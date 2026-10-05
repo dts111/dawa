@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   const token = String(form?.get("token") ?? "");
   const choice = String(form?.get("choice") ?? "");
   const days = Number(form?.get("days") ?? 0);
-  const result = applyResponse(token, choice, days);
+  const result = await applyResponse(token, choice, days);
   const url = new URL(`/r/${token}`, req.url);
   url.searchParams.set("done", result.ok ? "1" : "0");
   url.searchParams.set("msg", result.message);

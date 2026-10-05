@@ -50,7 +50,7 @@ function statusChip(t: ScheduledTask, today: string) {
 }
 
 /** Personalised "how is your task going?" email with one-click reply buttons. */
-export function renderTaskUpdateRequest(
+export async function renderTaskUpdateRequest(
   bundle: ProjectBundle,
   recipientName: string,
   recipientEmail: string,
@@ -58,16 +58,16 @@ export function renderTaskUpdateRequest(
   today: string,
 ) {
   const base = appUrl();
-  const rows = tasks
-    .map((t) => {
-      const token = createUpdateToken({
-        projectId: bundle.project.id,
-        taskId: t.id,
-        recipientEmail,
-        action: "task_update",
-      });
-      const link = (choice: string) => `${base}/r/${token.token}?choice=${choice}`;
-      return `<tr><td style="padding:14px 0;border-bottom:1px solid #e5e7eb;">
+  const rendered: string[] = [];
+  for (const t of tasks) {
+    const token = await createUpdateToken({
+      projectId: bundle.project.id,
+      taskId: t.id,
+      recipientEmail,
+      action: "task_update",
+    });
+    const link = (choice: string) => `${base}/r/${token.token}?choice=${choice}`;
+    rendered.push(`<tr><td style="padding:14px 0;border-bottom:1px solid #e5e7eb;">
         <div style="font-weight:600;font-size:14px;">${t.wbs} &nbsp;${escapeHtml(t.name)}</div>
         <div style="color:#6b7280;font-size:12px;margin:4px 0 10px;">
           ${formatDate(t.start)} &rarr; ${formatDate(t.finish)} &middot; ${t.duration} working day${t.duration === 1 ? "" : "s"}
@@ -76,9 +76,9 @@ export function renderTaskUpdateRequest(
         ${button(link("complete"), "Mark complete", "#15803d")}
         ${button(link("on_track"), "On track", BRAND)}
         ${button(link("delayed"), "Running late", CRITICAL)}
-      </td></tr>`;
-    })
-    .join("");
+      </td></tr>`);
+  }
+  const rows = rendered.join("");
 
   const body = `<p>Hello ${escapeHtml(recipientName)},</p>
     <p>Here are your open items on <strong>${escapeHtml(bundle.project.name)}</strong>. One click on a button below updates the plan — no login needed.</p>
@@ -145,7 +145,7 @@ export function renderProjectDigest(bundle: ProjectBundle, today: string) {
     ${list("Coming up", upcoming, BRAND)}
     <p style="margin-top:24px;">
       ${button(`${base}/project/${project.id}`, "Open the plan", BRAND)}
-      ${button(`${base}/api/projects/${project.id}/export/xlsx`, "Download Excel", "#374151")}
+      ${button(`${base}/api/projects/${project.id}/xlsx`, "Download Excel", "#374151")}
     </p>`;
 
   return {
@@ -182,6 +182,38 @@ export function renderRuleNotification(
   return {
     subject: `${bundle.project.name} — ${ruleName}`,
     html: shell(ruleName, body, "Sent automatically by EaaS Project Management."),
+  };
+}
+
+/** Invitation giving one stakeholder their own read-only link to the plan. */
+export function renderShareInvite(bundle: ProjectBundleData, token: string, message: string | null, from: string) {
+  const { project, schedule } = bundle;
+  const roots = schedule.tasks.filter((t) => t.level === 0);
+  const weight = roots.reduce((a, t) => a + Math.max(1, t.duration), 0);
+  const pct = weight
+    ? Math.round(roots.reduce((a, t) => a + t.rolledPercentComplete * Math.max(1, t.duration), 0) / weight)
+    : 0;
+  const note = message?.trim()
+    ? `<p style="margin:0 0 18px;padding:12px 14px;background:#f3f4f6;border-radius:8px;white-space:pre-line;">${escapeHtml(message.trim())}</p>`
+    : "";
+
+  const body = `<p>Hello,</p>
+    <p>${escapeHtml(from)} has shared the project plan <strong>${escapeHtml(project.name)}</strong> with you.</p>
+    ${note}
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px;font-size:13px;color:#374151;">
+      <tr><td style="padding:2px 16px 2px 0;color:#6b7280;">Timeline</td><td>${formatDate(schedule.projectStart)} &rarr; ${formatDate(schedule.projectFinish)}</td></tr>
+      <tr><td style="padding:2px 16px 2px 0;color:#6b7280;">Progress</td><td>${pct}% complete</td></tr>
+    </table>
+    <p>${button(`${appUrl()}/share/${token}`, "View the plan", BRAND)}</p>
+    <p style="color:#6b7280;font-size:12px;">The plan stays up to date — use the same link whenever you want to check progress. It is view-only and no sign-in is needed.</p>`;
+
+  return {
+    subject: `${project.name} — project plan shared with you`,
+    html: shell(
+      "A project plan has been shared with you",
+      body,
+      "This link is personal to you. Please do not forward it — ask the sender to invite others directly.",
+    ),
   };
 }
 

@@ -6,8 +6,12 @@ import { SESSION_COOKIE, verifySessionValue } from "@/lib/auth";
 //  - /login and the auth API, so you can actually sign in
 //  - /r/[token] and /api/respond — the emailed one-click links are secured by
 //    their own signed one-time token and are meant to work with no login at all
+//  - /share/[token] — read-only plan links for stakeholders, secured by their
+//    unguessable, revocable token
+//  - /api/automations/run — called by an external scheduler; the route itself
+//    requires AUTOMATION_SECRET (or a signed-in session)
 export const config = {
-  matcher: ["/((?!_next/|favicon.ico|login|api/auth/|r/|api/respond).*)"],
+  matcher: ["/((?!_next/|favicon.ico|login|api/auth/|r/|api/respond|share/|api/automations/run).*)"],
 };
 
 export function proxy(request: NextRequest) {

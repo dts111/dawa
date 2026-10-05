@@ -1,25 +1,27 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { runAllRules } from "@/lib/automations";
+import { SESSION_COOKIE, verifySessionValue } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 /**
  * Runs every enabled rule across every project. Point a scheduler at this once
- * a working morning — Windows Task Scheduler, cron, or your host's scheduler:
+ * a working morning — the included GitHub Actions workflow, cron, Windows Task
+ * Scheduler or your host's scheduler:
  *
  *   curl -X POST -H "x-automation-secret: <secret>" https://your-app/api/automations/run
  *
- * Set AUTOMATION_SECRET in .env.local to require the header. If it is unset the
- * endpoint is open, which is fine on a machine only your team can reach but
- * should be set before the app is on a public domain.
+ * The endpoint sits outside the sign-in gate so schedulers can reach it, so it
+ * authorises itself: the AUTOMATION_SECRET header (or ?secret=), or a signed-in
+ * admin session. With no secret configured, only a signed-in admin can run it.
  */
 async function handle(req: Request) {
   const secret = process.env.AUTOMATION_SECRET;
-  if (secret) {
-    const provided = req.headers.get("x-automation-secret") ?? new URL(req.url).searchParams.get("secret");
-    if (provided !== secret) {
-      return NextResponse.json({ error: "Not authorised." }, { status: 401 });
-    }
+  const provided = req.headers.get("x-automation-secret") ?? new URL(req.url).searchParams.get("secret");
+  const signedIn = verifySessionValue((await cookies()).get(SESSION_COOKIE)?.value);
+  if (!signedIn && !(secret && provided === secret)) {
+    return NextResponse.json({ error: "Not authorised." }, { status: 401 });
   }
 
   const results = await runAllRules();

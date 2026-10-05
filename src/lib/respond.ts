@@ -3,8 +3,8 @@ import { consumeUpdateToken, getTask, getUpdateToken, logActivity, updateTask } 
 const CHOICES = new Set(["complete", "on_track", "delayed"]);
 
 /** Applies an emailed one-click response. Returns a plain-language outcome. */
-export function applyResponse(token: string, choice: string, extraDays = 0) {
-  const record = getUpdateToken(token);
+export async function applyResponse(token: string, choice: string, extraDays = 0) {
+  const record = await getUpdateToken(token);
   if (!record) return { ok: false as const, message: "This link is not valid." };
   if (new Date(record.expiresAt).getTime() < Date.now())
     return { ok: false as const, message: "This link has expired. Ask for a fresh update email." };
@@ -15,22 +15,22 @@ export function applyResponse(token: string, choice: string, extraDays = 0) {
     };
   if (!CHOICES.has(choice)) return { ok: false as const, message: "Unrecognised action." };
 
-  const task = record.taskId ? getTask(record.taskId) : null;
+  const task = record.taskId ? await getTask(record.taskId) : null;
   if (!task) return { ok: false as const, message: "That task no longer exists." };
 
   let message: string;
   if (choice === "complete") {
-    updateTask(task.id, { percentComplete: 100 });
+    await updateTask(task.id, { percentComplete: 100 });
     message = `Thanks — "${task.name}" is marked 100% complete.`;
   } else if (choice === "on_track") {
     message = `Thanks — "${task.name}" recorded as on track.`;
   } else {
     const days = Math.max(1, Math.min(365, Math.round(extraDays || 0)));
-    updateTask(task.id, { duration: Math.max(0, task.duration) + days });
+    await updateTask(task.id, { duration: Math.max(0, task.duration) + days });
     message = `Thanks — "${task.name}" extended by ${days} working day${days === 1 ? "" : "s"}. Anything that follows it has been rescheduled.`;
   }
 
-  logActivity({
+  await logActivity({
     projectId: record.projectId,
     taskId: task.id,
     actor: record.recipientEmail,
@@ -43,7 +43,7 @@ export function applyResponse(token: string, choice: string, extraDays = 0) {
   });
 
   // "Running late" stays reusable so a longer delay can be reported again.
-  if (choice !== "delayed") consumeUpdateToken(token);
+  if (choice !== "delayed") await consumeUpdateToken(token);
 
   return { ok: true as const, message, projectId: record.projectId, taskName: task.name };
 }
