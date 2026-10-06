@@ -23,6 +23,8 @@ interface Props {
   onSelect: (id: string, additive: boolean) => void;
   onMoveTask: (id: string, newStart: string) => void;
   onResizeTask: (id: string, newDuration: number) => void;
+  /** Real heights of the task-grid rows (wrapped names make rows taller). Missing = ROW_HEIGHT. */
+  rowHeights?: number[];
 }
 
 interface DragState {
@@ -46,6 +48,7 @@ export default function GanttChart({
   onSelect,
   onMoveTask,
   onResizeTask,
+  rowHeights = [],
 }: Props) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const areaRef = useRef<HTMLDivElement>(null);
@@ -76,6 +79,20 @@ export default function GanttChart({
 
   const x = (iso: string) => calendarDaysBetween(origin, iso) * dayWidth;
   const width = totalDays * dayWidth;
+
+  // Row geometry follows the task grid, so bars stay level with wrapped (taller) rows.
+  const rowH = (i: number) => rowHeights[i] || ROW_HEIGHT;
+  const rowTops = useMemo(() => {
+    const tops: number[] = [];
+    let y = 0;
+    for (let i = 0; i < tasks.length; i++) {
+      tops.push(y);
+      y += rowHeights[i] || ROW_HEIGHT;
+    }
+    return { tops, total: y };
+  }, [tasks.length, rowHeights]);
+  /** Top of a 32px "lane" centred in row i — the bar offsets below are measured from it. */
+  const laneTop = (i: number) => rowTops.tops[i] + (rowH(i) - ROW_HEIGHT) / 2;
 
   // ---- Timeline header ------------------------------------------------------
   const ticks = useMemo(() => {
@@ -164,8 +181,10 @@ export default function GanttChart({
       const from = byId.get(dep.predecessorId);
       const to = byId.get(dep.successorId);
       if (!from || !to) continue;
-      const fy = (rowIndex.get(from.id) ?? 0) * ROW_HEIGHT + ROW_HEIGHT / 2;
-      const ty = (rowIndex.get(to.id) ?? 0) * ROW_HEIGHT + ROW_HEIGHT / 2;
+      const fi = rowIndex.get(from.id) ?? 0;
+      const fy = rowTops.tops[fi] + rowH(fi) / 2;
+      const ti = rowIndex.get(to.id) ?? 0;
+      const ty = rowTops.tops[ti] + rowH(ti) / 2;
       const fx = dep.type === "SS" || dep.type === "SF" ? x(from.start) : x(from.finish) + dayWidth;
       const tx = dep.type === "FF" || dep.type === "SF" ? x(to.finish) + dayWidth : x(to.start);
       const gap = 10;
@@ -176,7 +195,7 @@ export default function GanttChart({
       out.push({ d: path, critical: from.isCritical && to.isCritical });
     }
     return out;
-  }, [dependencies, tasks, dayWidth, origin]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dependencies, tasks, dayWidth, origin, rowTops]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div ref={areaRef} className="relative" style={{ width }}>
@@ -213,7 +232,7 @@ export default function GanttChart({
       </div>
 
       {/* Chart body */}
-      <div className="relative" style={{ width, height: tasks.length * ROW_HEIGHT }}>
+      <div className="relative" style={{ width, height: rowTops.total }}>
         {/* Non-working day shading */}
         {zoom === "day" &&
           Array.from({ length: totalDays }, (_, i) => addDays(origin, i))
@@ -234,7 +253,7 @@ export default function GanttChart({
             className={`absolute left-0 border-b border-slate-100 transition-colors ${
               selected.includes(t.id) ? "bg-blue-50/70" : ""
             }`}
-            style={{ top: i * ROW_HEIGHT, height: ROW_HEIGHT, width }}
+            style={{ top: rowTops.tops[i], height: rowH(i), width }}
           />
         ))}
 
@@ -246,7 +265,7 @@ export default function GanttChart({
         />
 
         {/* Dependency arrows */}
-        <svg className="pointer-events-none absolute inset-0 z-10" width={width} height={tasks.length * ROW_HEIGHT}>
+        <svg className="pointer-events-none absolute inset-0 z-10" width={width} height={rowTops.total}>
           <defs>
             <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
               <path d="M0,0 L6,3 L0,6 Z" fill="#64748b" />
@@ -277,7 +296,7 @@ export default function GanttChart({
             dayWidth,
             (calendarDaysBetween(start, cal.finishFor(start, duration)) + 1) * dayWidth,
           );
-          const top = i * ROW_HEIGHT;
+          const top = laneTop(i);
           const critical = showCritical && t.isCritical;
 
           return (

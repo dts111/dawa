@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { predecessorLabel } from "@/lib/schedule";
 import { STATUS_ORDER, STATUS_TOKENS } from "./statusTokens";
 import type { Dependency, Resource, ScheduledTask, TaskStatus } from "@/lib/types";
@@ -45,6 +45,8 @@ interface Props {
   onSetFinish: (id: string, iso: string) => void;
   onSetOwner: (id: string, resourceId: string | null) => void;
   onSetPredecessors: (id: string, raw: string) => void;
+  /** Heights of the rendered rows (in task order), so the Gantt bars can line up with wrapped rows. */
+  onRowHeights?: (heights: number[]) => void;
 }
 
 function Cell({
@@ -52,16 +54,19 @@ function Cell({
   width,
   align = "left",
   className = "",
+  wrap = false,
 }: {
   children: React.ReactNode;
   width: number;
   align?: "left" | "center" | "right";
   className?: string;
+  /** Let the content wrap (and the row grow) instead of cutting it off. */
+  wrap?: boolean;
 }) {
   return (
     <div
       style={{ width, textAlign: align }}
-      className={`shrink-0 truncate border-r border-slate-200 px-2 ${className}`}
+      className={`shrink-0 border-r border-slate-200 px-2 ${wrap ? "self-stretch flex items-center" : "truncate"} ${className}`}
     >
       {children}
     </div>
@@ -135,6 +140,70 @@ function EditableText({
   );
 }
 
+/**
+ * Like EditableText, but the text wraps onto further lines (Excel's "Wrap text")
+ * and the box grows to fit. A name is still one line of text: Enter saves, and
+ * pasted line breaks become spaces.
+ */
+function WrappingText({
+  value,
+  onCommit,
+  disabled = false,
+}: {
+  value: string;
+  onCommit: (v: string) => void;
+  disabled?: boolean;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [lastValue, setLastValue] = useState(value);
+  if (lastValue !== value) {
+    setLastValue(value);
+    setDraft(value);
+  }
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  // Fit the height to the wrapped text — on every edit, and whenever the column width changes.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [draft]);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={draft}
+      disabled={disabled}
+      readOnly={disabled}
+      onChange={(e) => setDraft(e.target.value.replace(/\r?\n/g, " "))}
+      onBlur={() => {
+        const next = draft.trim();
+        if (next && next !== value) onCommit(next);
+        else setDraft(value);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          (e.target as HTMLTextAreaElement).blur();
+        }
+        if (e.key === "Escape") {
+          setDraft(value);
+          (e.target as HTMLTextAreaElement).blur();
+        }
+      }}
+      className="block w-full resize-none overflow-hidden bg-transparent py-1 leading-snug break-words whitespace-normal outline-none focus:rounded focus:bg-white focus:ring-2 focus:ring-blue-400 disabled:cursor-not-allowed disabled:text-slate-400"
+    />
+  );
+}
+
 function StatusCell({
   task,
   readOnly,
@@ -191,9 +260,28 @@ export default function TaskGrid({
   onSetFinish,
   onSetOwner,
   onSetPredecessors,
+  onRowHeights,
 }: Props) {
   const widths = { ...COLS, ...columnWidths };
   const gridWidth = Object.values(widths).reduce((a, b) => a + b, 0);
+
+  // Wrapped names make rows taller; tell the Gantt chart every row's real height.
+  const rowEls = useRef(new Map<string, HTMLDivElement>());
+  const lastReported = useRef("");
+  const reportHeights = useCallback(() => {
+    const heights = tasks.map((t) => rowEls.current.get(t.id)?.offsetHeight || ROW_HEIGHT);
+    const key = heights.join(",");
+    if (key === lastReported.current) return;
+    lastReported.current = key;
+    onRowHeights?.(heights);
+  }, [tasks, onRowHeights]);
+
+  useLayoutEffect(() => {
+    reportHeights();
+    const ro = new ResizeObserver(reportHeights);
+    rowEls.current.forEach((el) => ro.observe(el));
+    return () => ro.disconnect();
+  }, [reportHeights]);
 
   const beginResize = (col: ResizableCol) => (e: React.MouseEvent) => {
     e.preventDefault();
@@ -246,7 +334,11 @@ export default function TaskGrid({
         return (
           <div
             key={t.id}
-            style={{ height: ROW_HEIGHT }}
+            ref={(el) => {
+              if (el) rowEls.current.set(t.id, el);
+              else rowEls.current.delete(t.id);
+            }}
+            style={{ minHeight: ROW_HEIGHT }}
             onMouseDown={(e) => onSelect(t.id, e.shiftKey || e.metaKey || e.ctrlKey)}
             className={`flex items-center border-b border-slate-100 ${t.level > 0 ? "text-[12.33px]" : "text-[13px]"} transition-colors ${
               isSelected
@@ -265,9 +357,10 @@ export default function TaskGrid({
             </Cell>
             <Cell
               width={widths.name}
+              wrap
               className={t.isSummary || t.isMilestone ? "font-semibold text-slate-900" : "text-slate-800"}
             >
-              <div className="flex items-center" style={{ paddingLeft: t.level * 14 }}>
+              <div className="flex w-full min-w-0 items-center" style={{ paddingLeft: t.level * 14 }}>
                 {t.isSummary ? (
                   <button
                     type="button"
@@ -285,11 +378,7 @@ export default function TaskGrid({
                     {t.isMilestone ? "◆" : "•"}
                   </span>
                 )}
-                <EditableText
-                  value={t.name}
-                  disabled={readOnly}
-                  onCommit={(v) => onPatch(t.id, { name: v })}
-                />
+                <WrappingText value={t.name} disabled={readOnly} onCommit={(v) => onPatch(t.id, { name: v })} />
               </div>
             </Cell>
             <Cell width={widths.days} align="center">

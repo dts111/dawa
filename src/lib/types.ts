@@ -94,6 +94,17 @@ export interface UserWithStats extends User {
   hasPendingLink: boolean;
 }
 
+export const TABLE_COLUMNS = ["name", "owner", "todo", "risk", "notes", "remarks"] as const;
+export type TableColumn = (typeof TABLE_COLUMNS)[number];
+
+/** Sizes the user dragged in the Table view, saved with the plan. */
+export interface TableLayout {
+  /** Column widths in px. */
+  cols?: Partial<Record<TableColumn, number>>;
+  /** Row heights in px, by task id. */
+  rows?: Record<string, number>;
+}
+
 export interface Project {
   id: string;
   /** The user who owns this plan. */
@@ -110,6 +121,8 @@ export interface Project {
   clientName: string | null;
   /** Small logo as a data: URL (png/jpeg/webp). Null falls back to the Dafegen bird. */
   clientLogo: string | null;
+  /** Column widths and row heights the user set in the Table view. */
+  tableLayout: TableLayout | null;
   createdAt: string;
 }
 

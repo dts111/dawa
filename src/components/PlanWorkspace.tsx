@@ -43,7 +43,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import type { ProjectBundleData, ScheduledTask, TaskStatus } from "@/lib/types";
+import type { ProjectBundleData, ScheduledTask, TableLayout, TaskStatus } from "@/lib/types";
 import { WorkCalendar, formatDate, todayISO } from "@/lib/calendar";
 
 export type ViewKey = "gantt" | "board" | "table" | "calendar" | "dashboard";
@@ -171,6 +171,8 @@ export default function PlanWorkspace({
   // markup exactly; the real values (if any) are restored after mount below.
   const [columnWidths, setColumnWidths] = useState<Record<ResizableCol, number>>(DEFAULT_COLUMN_WIDTHS);
   const [selected, setSelected] = useState<string[]>([]);
+  // Real row heights from the task grid (wrapped names make rows taller); the Gantt follows them.
+  const [rowHeights, setRowHeights] = useState<number[]>([]);
   const collapsedKey = `eaas-pm:collapsed:${initial.project.id}`;
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
@@ -265,6 +267,16 @@ export default function PlanWorkspace({
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  /** Saves the Table view's column widths / row heights with the plan (quietly — no spinner). */
+  const saveTableLayout = async (tableLayout: TableLayout | null) => {
+    try {
+      const json = await api(`/api/projects/${project.id}`, "PATCH", { tableLayout });
+      setBundle((b) => ({ ...b, project: { ...b.project, tableLayout: json.project.tableLayout } }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save the table sizes.");
     }
   };
 
@@ -722,11 +734,13 @@ export default function PlanWorkspace({
                     onSetFinish={setTaskFinish}
                     onSetOwner={setOwner}
                     onSetPredecessors={setTaskPredecessors}
+                    onRowHeights={setRowHeights}
                   />
                 </div>
                 <GanttChart
                   project={project}
                   tasks={visible}
+                  rowHeights={rowHeights}
                   dependencies={dependencies}
                   selected={selected}
                   zoom={zoom}
@@ -763,6 +777,7 @@ export default function PlanWorkspace({
               onPatch={patchTask}
               onSetOwner={setOwner}
               onSelect={focusTask}
+              onSaveLayout={readOnly ? undefined : saveTableLayout}
             />
           )}
 

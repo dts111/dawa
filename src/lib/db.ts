@@ -20,6 +20,7 @@ import type {
   Project,
   Resource,
   ShareLink,
+  TableLayout,
   Task,
   TaskStatus,
   User,
@@ -245,6 +246,7 @@ async function migrate(d: Client, isFile: boolean) {
   // Client name and logo, shown to stakeholders on the plan.
   await addColumnIfMissing(d, "projects", "clientName", "TEXT");
   await addColumnIfMissing(d, "projects", "clientLogo", "TEXT");
+  await addColumnIfMissing(d, "projects", "tableLayout", "TEXT");
 
   // Accounts: every plan belongs to one user.
   await addColumnIfMissing(d, "projects", "ownerId", "TEXT");
@@ -337,7 +339,18 @@ interface ProjectRow {
   workingDays: string;
   clientName: string | null;
   clientLogo: string | null;
+  tableLayout: string | null;
   createdAt: string;
+}
+
+function parseTableLayout(raw: string | null): TableLayout | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw);
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as TableLayout) : null;
+  } catch {
+    return null;
+  }
 }
 
 function parseJsonArray<T>(raw: string, fallback: T[]): T[] {
@@ -360,6 +373,7 @@ function mapProject(r: ProjectRow): Project {
     workingDays: parseJsonArray<number>(r.workingDays, [1, 2, 3, 4, 5]),
     clientName: r.clientName ?? null,
     clientLogo: r.clientLogo ?? null,
+    tableLayout: parseTableLayout(r.tableLayout ?? null),
     createdAt: r.createdAt,
   };
 }
@@ -409,7 +423,7 @@ export async function updateProject(id: string, patch: Partial<Project>): Promis
   const merged = { ...existing, ...patch, ownerId: existing.ownerId };
   await run(
     `UPDATE projects SET name = ?, description = ?, startDate = ?, holidays = ?, workingDays = ?,
-       clientName = ?, clientLogo = ?
+       clientName = ?, clientLogo = ?, tableLayout = ?
      WHERE id = ?`,
     merged.name,
     merged.description,
@@ -418,6 +432,7 @@ export async function updateProject(id: string, patch: Partial<Project>): Promis
     JSON.stringify(merged.workingDays),
     merged.clientName,
     merged.clientLogo,
+    merged.tableLayout ? JSON.stringify(merged.tableLayout) : null,
     id,
   );
   return getProject(id);
