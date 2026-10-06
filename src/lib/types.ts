@@ -83,6 +83,10 @@ export interface Project {
   holidays: string[];
   /** Which weekdays are working days. 0 = Sunday .. 6 = Saturday. */
   workingDays: number[];
+  /** The company this plan is for, shown to stakeholders. */
+  clientName: string | null;
+  /** Small logo as a data: URL (png/jpeg/webp). Null falls back to the Dafegen bird. */
+  clientLogo: string | null;
   createdAt: string;
 }
 

@@ -219,6 +219,10 @@ async function migrate(d: Client, isFile: boolean) {
   await addColumnIfMissing(d, "share_links", "lastSentAt", "TEXT");
   await addColumnIfMissing(d, "share_links", "lastViewedAt", "TEXT");
   await addColumnIfMissing(d, "share_links", "viewCount", "INTEGER NOT NULL DEFAULT 0");
+
+  // Client name and logo, shown to stakeholders on the plan.
+  await addColumnIfMissing(d, "projects", "clientName", "TEXT");
+  await addColumnIfMissing(d, "projects", "clientLogo", "TEXT");
 }
 
 /** SQLite has no "ADD COLUMN IF NOT EXISTS", so check the table info first. */
@@ -261,6 +265,8 @@ interface ProjectRow {
   startDate: string;
   holidays: string;
   workingDays: string;
+  clientName: string | null;
+  clientLogo: string | null;
   createdAt: string;
 }
 
@@ -281,6 +287,8 @@ function mapProject(r: ProjectRow): Project {
     startDate: r.startDate,
     holidays: parseJsonArray<string>(r.holidays, []),
     workingDays: parseJsonArray<number>(r.workingDays, [1, 2, 3, 4, 5]),
+    clientName: r.clientName ?? null,
+    clientLogo: r.clientLogo ?? null,
     createdAt: r.createdAt,
   };
 }
@@ -323,13 +331,16 @@ export async function updateProject(id: string, patch: Partial<Project>): Promis
   if (!existing) return null;
   const merged = { ...existing, ...patch };
   await run(
-    `UPDATE projects SET name = ?, description = ?, startDate = ?, holidays = ?, workingDays = ?
+    `UPDATE projects SET name = ?, description = ?, startDate = ?, holidays = ?, workingDays = ?,
+       clientName = ?, clientLogo = ?
      WHERE id = ?`,
     merged.name,
     merged.description,
     merged.startDate,
     JSON.stringify(merged.holidays),
     JSON.stringify(merged.workingDays),
+    merged.clientName,
+    merged.clientLogo,
     id,
   );
   return getProject(id);

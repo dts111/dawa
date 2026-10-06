@@ -10,12 +10,13 @@ import CalendarView from "./CalendarView";
 import DashboardView from "./DashboardView";
 import SidePanel, { type Panel } from "./SidePanels";
 import LogoutButton from "./LogoutButton";
-import BrandMark from "./BrandMark";
+import ClientMark from "./ClientMark";
 import {
   ArrowDown,
   ArrowUp,
   Bookmark,
   BookmarkX,
+  Building2,
   CalendarCog,
   CalendarDays,
   ChartGantt,
@@ -479,13 +480,16 @@ export default function PlanWorkspace({
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 pt-3">
           <div className="mr-auto flex min-w-0 items-center gap-3">
             {readOnly ? (
-              <BrandMark />
+              <ClientMark name={project.clientName} logo={project.clientLogo} height={40} />
             ) : (
               <Link href="/" title="All plans" aria-label="All plans" className="shrink-0">
-                <BrandMark />
+                <ClientMark name={project.clientName} logo={project.clientLogo} height={40} />
               </Link>
             )}
             <div className="min-w-0">
+              {project.clientName && (
+                <p className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase">{project.clientName}</p>
+              )}
               <EditableHeading value={project.name} disabled={readOnly} onCommit={renameProject} />
               <p className="flex flex-wrap items-center gap-x-2 text-[12px] text-slate-500">
                 <span className="font-mono">
@@ -521,6 +525,9 @@ export default function PlanWorkspace({
                   active={panel === "automations"}
                 >
                   Automations
+                </Btn>
+                <Btn icon={Building2} onClick={() => setPanel(panel === "client" ? null : "client")} active={panel === "client"}>
+                  Client
                 </Btn>
                 <Btn icon={Share2} onClick={() => setPanel(panel === "share" ? null : "share")} active={panel === "share"}>
                   Share

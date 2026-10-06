@@ -12,7 +12,7 @@ import { SESSION_COOKIE, verifySessionValue } from "@/lib/auth";
 //    requires AUTOMATION_SECRET (or a signed-in session)
 //  - the tab icon and logo image, which the sign-in page itself shows
 export const config = {
-  matcher: ["/((?!_next/|favicon.ico|icon.png|dafegen-mark.png|login|api/auth/|r/|api/respond|share/|api/automations/run).*)"],
+  matcher: ["/((?!_next/|favicon.ico|icon.png|dafegen-mark.png|dafegen-logo.jpeg|login|api/auth/|r/|api/respond|share/|api/automations/run).*)"],
 };
 
 export function proxy(request: NextRequest) {

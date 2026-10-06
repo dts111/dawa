@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { describeRule } from "@/lib/ruleText";
 import { formatDate } from "@/lib/calendar";
 import { STATUS_ORDER, STATUS_TOKENS } from "./statusTokens";
+import ClientMark from "./ClientMark";
 import type {
   AutomationRule,
   AutomationTrigger,
@@ -13,9 +14,10 @@ import type {
   TaskStatus,
 } from "@/lib/types";
 
-export type Panel = null | "team" | "email" | "links" | "settings" | "share" | "automations";
+export type Panel = null | "team" | "email" | "links" | "settings" | "share" | "automations" | "client";
 
 export const PANEL_TITLES: Record<Exclude<Panel, null>, string> = {
+  client: "Client & logo",
   team: "Team members",
   email: "Send an update",
   links: "Task links",
@@ -215,6 +217,10 @@ export default function SidePanel({
 
         {panel === "settings" && (
           <CalendarPanel bundle={bundle} onSave={(body) => call(`/api/projects/${project.id}`, "PATCH", body)} />
+        )}
+
+        {panel === "client" && (
+          <ClientPanel bundle={bundle} onSave={(body) => call(`/api/projects/${project.id}`, "PATCH", body)} />
         )}
 
         {panel === "share" && (
@@ -776,6 +782,106 @@ function RuleRow({
 // --------------------------------------------------------------- Calendar ---
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Longest side limits keep the logo small enough to store in the database. */
+const LOGO_BOX = { w: 480, h: 160 };
+
+/** Scales an uploaded image to fit LOGO_BOX and returns it as a PNG (or WebP) data URL. */
+async function shrinkLogo(file: File): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("That file isn't an image this browser can read."));
+      el.src = url;
+    });
+    const scale = Math.min(1, LOGO_BOX.w / img.naturalWidth, LOGO_BOX.h / img.naturalHeight);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const png = canvas.toDataURL("image/png");
+    return png.length <= 200_000 ? png : canvas.toDataURL("image/webp", 0.9);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function ClientPanel({
+  bundle,
+  onSave,
+}: {
+  bundle: ProjectBundleData;
+  onSave: (body: Record<string, unknown>) => void;
+}) {
+  const [clientName, setClientName] = useState(bundle.project.clientName ?? "");
+  const [logo, setLogo] = useState<string | null>(bundle.project.clientLogo);
+  const [logoError, setLogoError] = useState<string | null>(null);
+
+  const pickLogo = async (file: File | undefined) => {
+    if (!file) return;
+    setLogoError(null);
+    try {
+      setLogo(await shrinkLogo(file));
+    } catch (e) {
+      setLogoError(e instanceof Error ? e.message : "Could not read that image.");
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <p className="text-slate-600">
+        Shown at the top of this plan, on the cards on your home page, and to stakeholders who open their view-only link.
+        Without a logo, the Dafegen bird is shown.
+      </p>
+
+      <label className="block">
+        <span className="text-[12px] font-semibold text-slate-700">Client name</span>
+        <input
+          className={`${input} mt-1`}
+          value={clientName}
+          maxLength={80}
+          placeholder="e.g. Acme Water Authority"
+          onChange={(e) => setClientName(e.target.value)}
+        />
+      </label>
+
+      <div>
+        <span className="text-[12px] font-semibold text-slate-700">Logo</span>
+        <div className="mt-2 flex items-center gap-4 rounded-md border border-dashed border-slate-300 bg-slate-50 p-4">
+          <ClientMark name={clientName || null} logo={logo} height={48} />
+          <div className="min-w-0 flex-1 space-y-2">
+            <label className="inline-flex cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[12.5px] font-medium text-slate-700 hover:bg-slate-50">
+              {logo ? "Replace logo" : "Upload logo"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                onChange={(e) => pickLogo(e.target.files?.[0])}
+              />
+            </label>
+            {logo && (
+              <button type="button" onClick={() => setLogo(null)} className="ml-2 text-[12.5px] text-slate-500 hover:text-red-600">
+                Remove logo
+              </button>
+            )}
+            <p className="text-[11.5px] text-slate-500">PNG, JPEG or WebP. Wide logos work best.</p>
+          </div>
+        </div>
+        {logoError && <p className="mt-2 text-[12.5px] text-red-600">{logoError}</p>}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onSave({ clientName: clientName.trim() || null, clientLogo: logo })}
+        className="w-full rounded-md border-2 border-brand bg-brand px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:border-brand-hover hover:bg-brand-hover"
+      >
+        Save
+      </button>
+    </div>
+  );
+}
 
 function CalendarPanel({
   bundle,

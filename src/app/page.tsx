@@ -8,6 +8,7 @@ import LogoutButton from "@/components/LogoutButton";
 import DeleteProjectButton from "@/components/DeleteProjectButton";
 import RenameProjectButton from "@/components/RenameProjectButton";
 import BrandMark from "@/components/BrandMark";
+import ClientMark from "@/components/ClientMark";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +87,12 @@ export default async function Home() {
                 className="group relative flex flex-col rounded-lg border border-slate-200 bg-white p-5 shadow-card transition hover:-translate-y-0.5 hover:border-brand-ring hover:shadow-float"
               >
                 <Link href={`/project/${p.id}`} className="absolute inset-0 rounded-lg" aria-label={`Open ${p.name}`} />
+                {(p.clientName || p.clientLogo) && (
+                  <div className="relative mb-3 flex items-center gap-2">
+                    <ClientMark name={p.clientName} logo={p.clientLogo} height={28} />
+                    {p.clientName && <span className="truncate text-[12px] font-medium text-slate-500">{p.clientName}</span>}
+                  </div>
+                )}
                 <div className="relative flex items-start justify-between gap-2">
                   <h3 className="text-[17px] leading-snug font-semibold text-slate-900 group-hover:text-brand">
                     {p.name}
