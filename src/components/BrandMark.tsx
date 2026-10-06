@@ -1,13 +1,15 @@
-/** Square logo mark used in the app header, home page and sign-in card. */
+import Image from "next/image";
+
+/** Square logo mark (the Dafegen bird) used in the app header, home page and sign-in card. */
 export default function BrandMark({ size = 36 }: { size?: number }) {
   return (
     <span
-      className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-brand font-bold text-white shadow-card"
-      style={{ width: size, height: size, fontSize: size * 0.48 }}
+      className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white shadow-card"
+      style={{ width: size, height: size }}
       aria-hidden
     >
-      D
-      <span className="absolute right-0 bottom-0 h-1/4 w-1/4 rounded-tl-sm bg-gold" />
+      {/* The source PNG has wide empty margins, so scale it up to fill the box. */}
+      <Image src="/dafegen-mark.png" alt="" width={size} height={size} className="scale-[1.45] object-contain" priority />
     </span>
   );
 }
