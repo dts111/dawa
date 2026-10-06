@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
   // Self-contained server bundle for the Docker image (Fly.io). Render runs
   // `next start` and Netlify uses its own Next.js adapter, so neither needs it.
   ...(process.env.STANDALONE === "1" ? { output: "standalone" as const } : {}),
+  experimental: {
+    // Turbopack's on-disk build cache snapshots env values, which Netlify's
+    // secret scanner (rightly) rejects. Builds are small; skip the cache.
+    turbopackFileSystemCacheForBuild: false,
+  },
   async headers() {
     return [
       {
