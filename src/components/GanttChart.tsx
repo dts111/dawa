@@ -180,9 +180,10 @@ export default function GanttChart({
 
   return (
     <div ref={areaRef} className="relative" style={{ width }}>
-      {/* Header */}
+      {/* Header — above everything in the chart body (bars, links, today line: z-10/z-20),
+          below the sticky task grid on the left (z-30). */}
       <div
-        className="sticky top-0 z-10 border-b border-slate-300 bg-slate-800 text-slate-100"
+        className="sticky top-0 z-[25] border-b border-slate-300 bg-slate-800 text-slate-100"
         style={{ height: HEADER_HEIGHT, width }}
       >
         <div className="relative h-7 border-b border-slate-600">
