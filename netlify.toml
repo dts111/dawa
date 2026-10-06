@@ -9,3 +9,8 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+# Declared explicitly so the server routes are always deployed as functions,
+# even if Netlify's framework auto-detection doesn't kick in.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
