@@ -10,6 +10,7 @@ import {
 } from "@/lib/db";
 import { loadProject } from "@/lib/projectData";
 import { TASK_STATUSES, type Task, type TaskStatus } from "@/lib/types";
+import { requireProjectOf } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -31,6 +32,8 @@ function wouldCreateCycle(tasks: Task[], taskId: string, candidateParentId: stri
 
 export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProjectOf("task", id);
+  if (!access.ok) return access.response;
   const existing = await getTask(id);
   if (!existing) return NextResponse.json({ error: "Task not found." }, { status: 404 });
 
@@ -76,6 +79,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
   if (body.parentId !== undefined) {
     const tasks = await listTasks(existing.projectId);
+    if (body.parentId !== null && !tasks.some((t) => t.id === body.parentId)) {
+      return NextResponse.json({ error: "The parent task must be in this plan." }, { status: 400 });
+    }
     if (wouldCreateCycle(tasks, id, body.parentId)) {
       return NextResponse.json({ error: "That move would nest a task inside itself." }, { status: 400 });
     }
@@ -88,6 +94,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
 export async function DELETE(_req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProjectOf("task", id);
+  if (!access.ok) return access.response;
   const existing = await getTask(id);
   if (!existing) return NextResponse.json({ error: "Task not found." }, { status: 404 });
   await deleteTask(id);

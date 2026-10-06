@@ -8,6 +8,7 @@ import {
   updateTask,
 } from "@/lib/db";
 import { todayISO, addDays } from "@/lib/calendar";
+import { requireUser } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -16,8 +17,11 @@ export const runtime = "nodejs";
  * Everything here is ordinary demo content — delete the project when done.
  */
 export async function POST() {
+  const access = await requireUser();
+  if (!access.ok) return access.response;
   const start = addDays(todayISO(), -10);
   const project = await createProject({
+    ownerId: access.user.id,
     name: "EaaS Deployment — Demo Site",
     description: "Example plan showing summaries, links, milestones, resources and a baseline.",
     startDate: start,

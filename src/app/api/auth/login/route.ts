@@ -1,27 +1,41 @@
 import { NextResponse } from "next/server";
-import { checkCredentials, createSessionValue, SESSION_COOKIE, SESSION_MAX_AGE } from "@/lib/auth";
+import { createSessionValue, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
+import { getUserAuthByEmail, recordLoginFailure, recordLoginSuccess } from "@/lib/db";
+import { verifyPassword } from "@/lib/passwords";
 
 export const runtime = "nodejs";
 
+// One message for every failure, so the form doesn't reveal which emails have accounts.
+const FAILED = "Incorrect email or password.";
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  const email = typeof body.email === "string" ? body.email : "";
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body.password === "string" ? body.password : "";
+  if (!email || !password) return NextResponse.json({ error: FAILED }, { status: 401 });
 
-  if (!checkCredentials(email, password)) {
-    return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
+  const user = await getUserAuthByEmail(email);
+  if (!user) {
+    // Spend the same time as a real check, so response timing doesn't reveal unknown emails.
+    await verifyPassword(password, "scrypt$AAAAAAAAAAAAAAAAAAAAAA$AAAA");
+    return NextResponse.json({ error: FAILED }, { status: 401 });
   }
 
+  if (user.lockedUntil && user.lockedUntil > new Date().toISOString()) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please wait 15 minutes and try again." },
+      { status: 429 },
+    );
+  }
+
+  const ok = await verifyPassword(password, user.passwordHash);
+  if (!ok || user.status !== "active") {
+    if (!ok) await recordLoginFailure(user);
+    return NextResponse.json({ error: FAILED }, { status: 401 });
+  }
+
+  await recordLoginSuccess(user.id);
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESSION_COOKIE, createSessionValue(email.trim().toLowerCase()), {
-    httpOnly: true,
-    // APP_URL, not NODE_ENV — `next start` sets NODE_ENV=production even for
-    // plain-HTTP LAN/localhost use, and a Secure cookie would silently stop
-    // being sent by the browser in that case.
-    secure: (process.env.APP_URL ?? "").startsWith("https://"),
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_MAX_AGE,
-  });
+  res.cookies.set(SESSION_COOKIE, createSessionValue(user.id, Number(user.sessionVersion)), sessionCookieOptions());
   return res;
 }

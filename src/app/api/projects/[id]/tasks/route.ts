@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createTask, listTasks, logActivity } from "@/lib/db";
+import { allBelongToProject, createTask, listTasks, logActivity } from "@/lib/db";
 import { loadProject } from "@/lib/projectData";
+import { requireProject } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -8,13 +9,20 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProject(id);
+  if (!access.ok) return access.response;
   return NextResponse.json({ tasks: await listTasks(id) });
 }
 
 export async function POST(req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProject(id);
+  if (!access.ok) return access.response;
   const body = await req.json().catch(() => ({}));
   const name = String(body.name ?? "New task").trim() || "New task";
+  if (body.parentId && !(await allBelongToProject("task", [String(body.parentId)], id))) {
+    return NextResponse.json({ error: "The parent task must be in this plan." }, { status: 400 });
+  }
 
   // Insert directly beneath a given row when the UI asks for it.
   let sortOrder: number | undefined = body.sortOrder;

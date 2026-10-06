@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { deleteResource, getResource, updateResource } from "@/lib/db";
 import { loadProject } from "@/lib/projectData";
+import { requireProjectOf } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,8 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProjectOf("resource", id);
+  if (!access.ok) return access.response;
   const existing = await getResource(id);
   if (!existing) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
   const body = await req.json().catch(() => ({}));
@@ -17,6 +20,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
 export async function DELETE(_req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProjectOf("resource", id);
+  if (!access.ok) return access.response;
   const existing = await getResource(id);
   if (!existing) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
   await deleteResource(id);

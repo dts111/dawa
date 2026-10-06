@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { createDependency, listDependencies } from "@/lib/db";
+import { allBelongToProject, createDependency, listDependencies } from "@/lib/db";
 import { loadProject } from "@/lib/projectData";
 import { scheduleProject } from "@/lib/schedule";
 import { listTasks, getProject } from "@/lib/db";
+import { requireProject } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -10,16 +11,23 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProject(id);
+  if (!access.ok) return access.response;
   return NextResponse.json({ dependencies: await listDependencies(id) });
 }
 
 export async function POST(req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProject(id);
+  if (!access.ok) return access.response;
   const body = await req.json().catch(() => ({}));
   const predecessorId = String(body.predecessorId ?? "");
   const successorId = String(body.successorId ?? "");
   if (!predecessorId || !successorId || predecessorId === successorId) {
     return NextResponse.json({ error: "Pick two different tasks to link." }, { status: 400 });
+  }
+  if (!(await allBelongToProject("task", [predecessorId, successorId], id))) {
+    return NextResponse.json({ error: "Both tasks must be in this plan." }, { status: 400 });
   }
 
   const dep = await createDependency({

@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { CalendarDays, CircleAlert, FolderKanban, ListChecks, Users } from "lucide-react";
+import { redirect } from "next/navigation";
+import { CalendarDays, CircleAlert, FolderKanban, ListChecks, ShieldCheck, Users } from "lucide-react";
+import { currentUser } from "@/lib/access";
 import { listProjects } from "@/lib/db";
 import { loadProject } from "@/lib/projectData";
 import { formatDate, todayISO } from "@/lib/calendar";
@@ -13,7 +15,9 @@ import ClientMark from "@/components/ClientMark";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const projects = await listProjects();
+  const user = await currentUser();
+  if (!user) redirect("/login");
+  const projects = await listProjects(user.id);
   const today = todayISO();
 
   // A one-line health summary per plan, from the same scheduler the plan uses.
@@ -49,7 +53,18 @@ export default async function Home() {
               <p className="text-[12px] leading-tight text-slate-500">Project Management</p>
             </div>
           </div>
-          <LogoutButton />
+          <div className="flex items-center gap-2">
+            <span className="hidden text-[12.5px] text-slate-500 sm:inline">{user.name === "Administrator" ? user.email : user.name}</span>
+            {user.role === "admin" && (
+              <Link
+                href="/admin"
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12.5px] font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+              >
+                <ShieldCheck size={14} aria-hidden /> Admin
+              </Link>
+            )}
+            <LogoutButton />
+          </div>
         </div>
       </header>
 

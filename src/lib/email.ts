@@ -217,6 +217,28 @@ export function renderShareInvite(bundle: ProjectBundleData, token: string, mess
   };
 }
 
+/** Invitation to create an account, or a password-reset link (same flow). */
+export function renderAccountLink(kind: "invite" | "reset", name: string, link: string, from: string) {
+  const intro =
+    kind === "invite"
+      ? `<p>${escapeHtml(from)} has given you an account on <strong>Dafegen Project Management</strong>, where you can build and track your own project plans.</p>
+         <p>Choose a password to get started:</p>`
+      : `<p>A password reset was requested for your Dafegen Project Management account. Choose a new password:</p>`;
+  const body = `<p>Hello ${escapeHtml(name)},</p>
+    ${intro}
+    <p>${button(link, kind === "invite" ? "Set up my account" : "Choose a new password", BRAND)}</p>
+    <p style="color:#6b7280;font-size:12px;">This link works once and expires in 7 days. If you weren't expecting it, you can ignore this email.</p>`;
+  return {
+    subject:
+      kind === "invite" ? "Your Dafegen Project Management account" : "Reset your Dafegen Project Management password",
+    html: shell(
+      kind === "invite" ? "You've been invited" : "Reset your password",
+      body,
+      "Sent by Dafegen Project Management.",
+    ),
+  };
+}
+
 export function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c,

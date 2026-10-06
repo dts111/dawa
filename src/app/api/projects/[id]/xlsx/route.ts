@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildWorkbook } from "@/lib/excel";
 import { loadProject } from "@/lib/projectData";
+import { requireProject } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,8 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProject(id);
+  if (!access.ok) return access.response;
   const bundle = await loadProject(id);
   if (!bundle) return NextResponse.json({ error: "Project not found." }, { status: 404 });
 

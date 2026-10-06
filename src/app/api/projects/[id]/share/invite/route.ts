@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { createInvite, getActiveShareLink, logActivity, markInviteSent } from "@/lib/db";
 import { loadProject } from "@/lib/projectData";
 import { renderShareInvite, sendEmail, type SendResult } from "@/lib/email";
-import { adminEmail, SESSION_COOKIE, verifySessionValue } from "@/lib/auth";
+import { requireProject } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -19,12 +18,14 @@ const MAX_INVITES = 50;
  */
 export async function POST(req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProject(id);
+  if (!access.ok) return access.response;
   const bundle = await loadProject(id);
   if (!bundle) return NextResponse.json({ error: "Project not found." }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
-  const session = verifySessionValue((await cookies()).get(SESSION_COOKIE)?.value);
-  const from = session?.email || adminEmail() || "The project team";
+  const { user } = access;
+  const from = user.name && user.name !== "Administrator" ? `${user.name} (${user.email})` : user.email;
 
   let targets: { email: string; message: string | null; token: string }[] = [];
 

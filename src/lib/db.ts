@@ -22,7 +22,12 @@ import type {
   ShareLink,
   Task,
   TaskStatus,
+  User,
+  UserRole,
+  UserStatus,
+  UserWithStats,
 } from "./types";
+import { hashPassword, verifyPassword } from "./passwords";
 
 /** DATABASE_URL wins (libsql://… for Turso, or file:…); DATABASE_FILE is the older local-only setting. */
 function databaseUrl(): string {
@@ -205,6 +210,23 @@ async function migrate(d: Client, isFile: boolean) {
       createdAt TEXT NOT NULL,
       UNIQUE(ruleId, taskId, recipient, onDate)
     );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      passwordHash TEXT,
+      role TEXT NOT NULL DEFAULT 'user',
+      status TEXT NOT NULL DEFAULT 'invited',
+      sessionVersion INTEGER NOT NULL DEFAULT 1,
+      inviteTokenHash TEXT,
+      inviteExpiresAt TEXT,
+      failedLogins INTEGER NOT NULL DEFAULT 0,
+      lockedUntil TEXT,
+      createdAt TEXT NOT NULL,
+      lastLoginAt TEXT
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_invite ON users(inviteTokenHash);
   `);
 
   await addColumnIfMissing(d, "tasks", "status", "TEXT");
@@ -223,6 +245,53 @@ async function migrate(d: Client, isFile: boolean) {
   // Client name and logo, shown to stakeholders on the plan.
   await addColumnIfMissing(d, "projects", "clientName", "TEXT");
   await addColumnIfMissing(d, "projects", "clientLogo", "TEXT");
+
+  // Accounts: every plan belongs to one user.
+  await addColumnIfMissing(d, "projects", "ownerId", "TEXT");
+  await d.execute("CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(ownerId)");
+
+  await ensureAdmin(d);
+}
+
+/**
+ * Seeds the administrator from ADMIN_EMAIL / ADMIN_PASSWORD the first time, keeps the
+ * admin's email in step with ADMIN_EMAIL, and hands any plan without an owner to the admin
+ * (which is how plans made before accounts existed end up with the admin).
+ */
+async function ensureAdmin(d: Client) {
+  const email = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD ?? "";
+
+  const existing = await d.execute(
+    "SELECT id, email, passwordHash FROM users WHERE role = 'admin' ORDER BY createdAt LIMIT 1",
+  );
+  let adminId = existing.rows[0]?.id as string | undefined;
+
+  // ADMIN_PASSWORD stays the source of truth for the admin's password: changing it in the
+  // host's settings changes the password (and signs the admin out elsewhere).
+  if (adminId && password && !(await verifyPassword(password, existing.rows[0]?.passwordHash as string | null))) {
+    await d.execute({
+      sql: "UPDATE users SET passwordHash = ?, sessionVersion = sessionVersion + 1, status = 'active' WHERE id = ?",
+      args: [await hashPassword(password), adminId],
+    });
+  }
+
+  if (!adminId) {
+    if (!email || !password) return; // Nothing to seed from; sign-in stays closed until it is set.
+    adminId = randomUUID();
+    await d.execute({
+      sql: `INSERT INTO users (id, email, name, passwordHash, role, status, createdAt)
+            VALUES (?, ?, ?, ?, 'admin', 'active', ?)`,
+      args: [adminId, email, "Administrator", await hashPassword(password), new Date().toISOString()],
+    });
+  } else if (email && existing.rows[0]?.email !== email) {
+    const taken = await d.execute({ sql: "SELECT 1 FROM users WHERE email = ?", args: [email] });
+    if (!taken.rows.length) {
+      await d.execute({ sql: "UPDATE users SET email = ? WHERE id = ?", args: [email, adminId] });
+    }
+  }
+
+  await d.execute({ sql: "UPDATE projects SET ownerId = ? WHERE ownerId IS NULL", args: [adminId] });
 }
 
 /** SQLite has no "ADD COLUMN IF NOT EXISTS", so check the table info first. */
@@ -260,6 +329,7 @@ const now = () => new Date().toISOString();
 
 interface ProjectRow {
   id: string;
+  ownerId: string | null;
   name: string;
   description: string | null;
   startDate: string;
@@ -282,6 +352,7 @@ function parseJsonArray<T>(raw: string, fallback: T[]): T[] {
 function mapProject(r: ProjectRow): Project {
   return {
     id: r.id,
+    ownerId: r.ownerId ?? null,
     name: r.name,
     description: r.description,
     startDate: r.startDate,
@@ -295,8 +366,11 @@ function mapProject(r: ProjectRow): Project {
 
 // --- Projects --------------------------------------------------------------
 
-export async function listProjects(): Promise<Project[]> {
-  return (await all<ProjectRow>("SELECT * FROM projects ORDER BY createdAt DESC")).map(mapProject);
+/** One user's plans, newest first. */
+export async function listProjects(ownerId: string): Promise<Project[]> {
+  return (await all<ProjectRow>("SELECT * FROM projects WHERE ownerId = ? ORDER BY createdAt DESC", ownerId)).map(
+    mapProject,
+  );
 }
 
 export async function getProject(id: string): Promise<Project | null> {
@@ -305,6 +379,7 @@ export async function getProject(id: string): Promise<Project | null> {
 }
 
 export async function createProject(input: {
+  ownerId: string;
   name: string;
   description?: string | null;
   startDate: string;
@@ -313,9 +388,10 @@ export async function createProject(input: {
 }): Promise<Project> {
   const id = newId();
   await run(
-    `INSERT INTO projects (id, name, description, startDate, holidays, workingDays, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO projects (id, ownerId, name, description, startDate, holidays, workingDays, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
+    input.ownerId,
     input.name,
     input.description ?? null,
     input.startDate,
@@ -329,7 +405,8 @@ export async function createProject(input: {
 export async function updateProject(id: string, patch: Partial<Project>): Promise<Project | null> {
   const existing = await getProject(id);
   if (!existing) return null;
-  const merged = { ...existing, ...patch };
+  // Ownership is never changed through a plan edit.
+  const merged = { ...existing, ...patch, ownerId: existing.ownerId };
   await run(
     `UPDATE projects SET name = ?, description = ?, startDate = ?, holidays = ?, workingDays = ?,
        clientName = ?, clientLogo = ?
@@ -348,6 +425,145 @@ export async function updateProject(id: string, patch: Partial<Project>): Promis
 
 export async function deleteProject(id: string) {
   await run("DELETE FROM projects WHERE id = ?", id);
+}
+
+/** Which plan a task / link / team member / rule belongs to — used for access checks. */
+export async function projectIdFor(
+  kind: "task" | "dependency" | "resource" | "automation",
+  id: string,
+): Promise<string | null> {
+  const table = { task: "tasks", dependency: "dependencies", resource: "resources", automation: "automation_rules" }[kind];
+  const r = await get<{ projectId: string }>(`SELECT projectId FROM ${table} WHERE id = ?`, id);
+  return r?.projectId ?? null;
+}
+
+/** True when every id is a task (or resource) of the given plan. Guards against cross-plan links. */
+export async function allBelongToProject(kind: "task" | "resource", ids: string[], projectId: string): Promise<boolean> {
+  const unique = [...new Set(ids)];
+  if (!unique.length) return true;
+  const table = kind === "task" ? "tasks" : "resources";
+  const r = await get<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM ${table} WHERE projectId = ? AND id IN (${unique.map(() => "?").join(",")})`,
+    projectId,
+    ...unique,
+  );
+  return Number(r?.n ?? 0) === unique.length;
+}
+
+// --- Users -----------------------------------------------------------------
+
+interface UserRow extends User {
+  passwordHash: string | null;
+  inviteTokenHash: string | null;
+  inviteExpiresAt: string | null;
+  failedLogins: number;
+  lockedUntil: string | null;
+}
+
+/** Fields only the auth code needs; never sent to the browser. */
+export type UserAuthRecord = UserRow;
+
+function publicUser(r: UserRow): User {
+  return {
+    id: r.id,
+    email: r.email,
+    name: r.name,
+    role: r.role,
+    status: r.status,
+    sessionVersion: Number(r.sessionVersion),
+    createdAt: r.createdAt,
+    lastLoginAt: r.lastLoginAt,
+  };
+}
+
+export async function getUserById(id: string): Promise<User | null> {
+  const r = await get<UserRow>("SELECT * FROM users WHERE id = ?", id);
+  return r ? publicUser(r) : null;
+}
+
+export async function getUserAuthByEmail(email: string): Promise<UserAuthRecord | null> {
+  return get<UserRow>("SELECT * FROM users WHERE email = ?", email.trim().toLowerCase());
+}
+
+export async function getUserAuthByInviteHash(tokenHash: string): Promise<UserAuthRecord | null> {
+  return get<UserRow>("SELECT * FROM users WHERE inviteTokenHash = ?", tokenHash);
+}
+
+export async function listUsersWithStats(): Promise<UserWithStats[]> {
+  const rows = await all<UserRow & { planCount: number }>(
+    `SELECT u.*, (SELECT COUNT(*) FROM projects p WHERE p.ownerId = u.id) AS planCount
+     FROM users u ORDER BY u.role = 'admin' DESC, u.createdAt DESC`,
+  );
+  const nowIso = now();
+  return rows.map((r) => ({
+    ...publicUser(r),
+    planCount: Number(r.planCount),
+    hasPendingLink: !!r.inviteTokenHash && !!r.inviteExpiresAt && r.inviteExpiresAt > nowIso,
+  }));
+}
+
+export async function createInvitedUser(input: { email: string; name: string; role?: UserRole }): Promise<User> {
+  const id = newId();
+  await run(
+    "INSERT INTO users (id, email, name, role, status, createdAt) VALUES (?, ?, ?, ?, 'invited', ?)",
+    id,
+    input.email.trim().toLowerCase(),
+    input.name.trim(),
+    input.role ?? "user",
+    now(),
+  );
+  return (await getUserById(id))!;
+}
+
+/** Stores a fresh invite / reset link (hash only) valid for `days`. */
+export async function setInviteToken(userId: string, tokenHash: string, days = 7) {
+  const expires = new Date(Date.now() + days * 86_400_000).toISOString();
+  await run("UPDATE users SET inviteTokenHash = ?, inviteExpiresAt = ? WHERE id = ?", tokenHash, expires, userId);
+}
+
+/** Sets a password, activates the account, clears the link and signs out other sessions. */
+export async function setPasswordAndActivate(userId: string, passwordHash: string): Promise<User> {
+  await run(
+    `UPDATE users SET passwordHash = ?, status = 'active', inviteTokenHash = NULL, inviteExpiresAt = NULL,
+       failedLogins = 0, lockedUntil = NULL, sessionVersion = sessionVersion + 1
+     WHERE id = ?`,
+    passwordHash,
+    userId,
+  );
+  return (await getUserById(userId))!;
+}
+
+/** Disabling (or re-enabling) signs the user out everywhere. */
+export async function setUserStatus(userId: string, status: UserStatus) {
+  await run("UPDATE users SET status = ?, sessionVersion = sessionVersion + 1 WHERE id = ?", status, userId);
+}
+
+/** Invalidates every existing session for the user (used by password reset). */
+export async function bumpSessionVersion(userId: string) {
+  await run("UPDATE users SET sessionVersion = sessionVersion + 1 WHERE id = ?", userId);
+}
+
+/** Deletes the user and every plan they own (tasks etc. cascade). */
+export async function deleteUserAndPlans(userId: string) {
+  await transaction([
+    { sql: "DELETE FROM projects WHERE ownerId = ?", args: [userId] },
+    { sql: "DELETE FROM users WHERE id = ?", args: [userId] },
+  ]);
+}
+
+export async function recordLoginSuccess(userId: string) {
+  await run("UPDATE users SET failedLogins = 0, lockedUntil = NULL, lastLoginAt = ? WHERE id = ?", now(), userId);
+}
+
+/** Counts a failed sign-in; locks the account for `lockMinutes` once it reaches `maxAttempts`. */
+export async function recordLoginFailure(user: UserAuthRecord, maxAttempts = 10, lockMinutes = 15) {
+  const failed = Number(user.failedLogins) + 1;
+  if (failed >= maxAttempts) {
+    const lockUntil = new Date(Date.now() + lockMinutes * 60_000).toISOString();
+    await run("UPDATE users SET failedLogins = 0, lockedUntil = ? WHERE id = ?", lockUntil, user.id);
+  } else {
+    await run("UPDATE users SET failedLogins = ? WHERE id = ?", failed, user.id);
+  }
 }
 
 // --- Tasks -----------------------------------------------------------------

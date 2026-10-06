@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { deleteProject, updateProject } from "@/lib/db";
 import { loadProject } from "@/lib/projectData";
+import { requireProject } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,8 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProject(id);
+  if (!access.ok) return access.response;
   const bundle = await loadProject(id);
   if (!bundle) return NextResponse.json({ error: "Project not found." }, { status: 404 });
   return NextResponse.json(bundle);
@@ -18,6 +21,8 @@ const MAX_LOGO_CHARS = 300_000;
 
 export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProject(id);
+  if (!access.ok) return access.response;
   const body = await req.json().catch(() => ({}));
 
   // Client branding: validate here, since these values are shown to stakeholders.
@@ -38,6 +43,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
 export async function DELETE(_req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProject(id);
+  if (!access.ok) return access.response;
   await deleteProject(id);
   return NextResponse.json({ ok: true });
 }

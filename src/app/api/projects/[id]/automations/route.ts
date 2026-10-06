@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAutomation, listAutomations } from "@/lib/db";
 import { loadProject } from "@/lib/projectData";
 import type { AutomationAction, AutomationTrigger, TaskStatus } from "@/lib/types";
+import { requireProject } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -18,11 +19,15 @@ const ACTIONS: AutomationAction[] = ["email_owner", "email_addresses"];
 
 export async function GET(_req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProject(id);
+  if (!access.ok) return access.response;
   return NextResponse.json({ automations: await listAutomations(id) });
 }
 
 export async function POST(req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProject(id);
+  if (!access.ok) return access.response;
   const body = await req.json().catch(() => ({}));
 
   const trigger = TRIGGERS.includes(body.trigger) ? (body.trigger as AutomationTrigger) : null;

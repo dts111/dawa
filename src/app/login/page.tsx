@@ -37,7 +37,7 @@ function LoginForm() {
         <Image src="/dafegen-logo.jpeg" alt="DAFEGEN" width={1174} height={285} priority className="h-auto w-full max-w-[260px]" />
       </div>
       <h1 className="mt-6 text-center text-lg font-semibold text-slate-900">Sign in</h1>
-      <p className="mt-1 text-center text-[13px] text-slate-500">Administrator access to Dafegen Project Management.</p>
+      <p className="mt-1 text-center text-[13px] text-slate-500">Sign in to your Dafegen project plans.</p>
 
       <div className="mt-6 space-y-3.5">
         <label className="block">

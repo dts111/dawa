@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { runAllRules } from "@/lib/automations";
-import { SESSION_COOKIE, verifySessionValue } from "@/lib/auth";
+import { currentUser } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -19,8 +18,9 @@ export const runtime = "nodejs";
 async function handle(req: Request) {
   const secret = process.env.AUTOMATION_SECRET;
   const provided = req.headers.get("x-automation-secret") ?? new URL(req.url).searchParams.get("secret");
-  const signedIn = verifySessionValue((await cookies()).get(SESSION_COOKIE)?.value);
-  if (!signedIn && !(secret && provided === secret)) {
+  // Runs every user's rules, so a session only counts if it's the admin's.
+  const signedInAdmin = (await currentUser())?.role === "admin";
+  if (!signedInAdmin && !(secret && provided === secret)) {
     return NextResponse.json({ error: "Not authorised." }, { status: 401 });
   }
 

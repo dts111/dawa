@@ -9,6 +9,7 @@ import {
   type SendResult,
 } from "@/lib/email";
 import { todayISO } from "@/lib/calendar";
+import { requireProject } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,8 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: Request, { params }: Ctx) {
   const { id } = await params;
+  const access = await requireProject(id);
+  if (!access.ok) return access.response;
   const bundle = await loadProject(id);
   if (!bundle) return NextResponse.json({ error: "Project not found." }, { status: 404 });
 

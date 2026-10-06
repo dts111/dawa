@@ -73,8 +73,31 @@ export interface Assignment {
   units: number;
 }
 
+export type UserRole = "admin" | "user";
+export type UserStatus = "invited" | "active" | "disabled";
+
+/** A person who can sign in. Each user sees only the plans they own (the admin sees all). */
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  status: UserStatus;
+  sessionVersion: number;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+export interface UserWithStats extends User {
+  planCount: number;
+  /** True while an unexpired invite or reset link exists. */
+  hasPendingLink: boolean;
+}
+
 export interface Project {
   id: string;
+  /** The user who owns this plan. */
+  ownerId: string | null;
   name: string;
   description: string | null;
   /** Project start date, ISO yyyy-mm-dd. Tasks with no predecessor begin here. */
