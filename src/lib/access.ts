@@ -42,9 +42,9 @@ export function canAccess(user: User, project: Pick<Project, "ownerId">): boolea
 }
 
 export async function requireProject(projectId: string): Promise<Ok<{ user: User; project: Project }> | Denied> {
-  const user = await currentUser();
+  // In parallel: two lookups, one round trip's worth of waiting.
+  const [user, project] = await Promise.all([currentUser(), getProject(projectId)]);
   if (!user) return { ok: false, response: unauthorised() };
-  const project = await getProject(projectId);
   if (!project || !canAccess(user, project)) return { ok: false, response: notFound() };
   return { ok: true, user, project };
 }

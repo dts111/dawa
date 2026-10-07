@@ -394,34 +394,20 @@ export default function PlanWorkspace({
     patchTask(first.id, { parentId: parent?.parentId ?? null, sortOrder: (parent?.sortOrder ?? 0) + 0.5 });
   };
 
-  /** Swaps the selected task with its neighbouring sibling — # renumbers automatically. */
-  const moveUp = () => {
-    if (!first) return;
-    const siblings = schedule.tasks.filter((t) => t.parentId === first.parentId);
-    const idx = siblings.findIndex((t) => t.id === first.id);
-    if (idx <= 0) return;
-    const prev = siblings[idx - 1];
-    const movingId = first.id;
-    const movingSort = first.sortOrder;
-    run(async () => {
-      await api(`/api/tasks/${movingId}`, "PATCH", { sortOrder: prev.sortOrder });
-      return api(`/api/tasks/${prev.id}`, "PATCH", { sortOrder: movingSort });
-    });
+  /**
+   * Swaps the selected task with its neighbouring sibling — # renumbers automatically.
+   * One server request does the whole swap, so quick repeated clicks can't scramble the order.
+   */
+  const moveSelected = (direction: "up" | "down") => {
+    if (!first || busy) return;
+    run(() => api(`/api/tasks/${first.id}/move`, "POST", { direction }));
   };
+  const moveUp = () => moveSelected("up");
+  const moveDown = () => moveSelected("down");
 
-  const moveDown = () => {
-    if (!first) return;
-    const siblings = schedule.tasks.filter((t) => t.parentId === first.parentId);
-    const idx = siblings.findIndex((t) => t.id === first.id);
-    if (idx === -1 || idx >= siblings.length - 1) return;
-    const next = siblings[idx + 1];
-    const movingId = first.id;
-    const movingSort = first.sortOrder;
-    run(async () => {
-      await api(`/api/tasks/${movingId}`, "PATCH", { sortOrder: next.sortOrder });
-      return api(`/api/tasks/${next.id}`, "PATCH", { sortOrder: movingSort });
-    });
-  };
+  /** Drag-and-drop by the # number: place a task before or after another one. */
+  const moveTaskTo = (id: string, targetId: string, position: "before" | "after") =>
+    run(() => api(`/api/tasks/${id}/move`, "POST", { targetId, position }));
 
   const removeSelected = async () => {
     for (const id of selected) await run(() => api(`/api/tasks/${id}`, "DELETE"));
@@ -645,8 +631,8 @@ export default function PlanWorkspace({
             <Divider />
             <Btn icon={IndentDecrease} onClick={outdent} disabled={!first?.parentId} title="Outdent (move left)" />
             <Btn icon={IndentIncrease} onClick={indent} disabled={!first} title="Indent (make a sub-task)" />
-            <Btn icon={ArrowUp} onClick={moveUp} disabled={!first} title="Move up" />
-            <Btn icon={ArrowDown} onClick={moveDown} disabled={!first} title="Move down" />
+            <Btn icon={ArrowUp} onClick={moveUp} disabled={!first || busy} title="Move up" />
+            <Btn icon={ArrowDown} onClick={moveDown} disabled={!first || busy} title="Move down" />
             <Divider />
             <Btn
               icon={Link2}
@@ -735,6 +721,7 @@ export default function PlanWorkspace({
                     onSetOwner={setOwner}
                     onSetPredecessors={setTaskPredecessors}
                     onRowHeights={setRowHeights}
+                    onMoveTask={moveTaskTo}
                   />
                 </div>
                 <GanttChart

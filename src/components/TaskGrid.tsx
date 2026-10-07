@@ -47,7 +47,12 @@ interface Props {
   onSetPredecessors: (id: string, raw: string) => void;
   /** Heights of the rendered rows (in task order), so the Gantt bars can line up with wrapped rows. */
   onRowHeights?: (heights: number[]) => void;
+  /** Drag-and-drop by the # number: put task `id` before/after task `targetId`. */
+  onMoveTask?: (id: string, targetId: string, position: "before" | "after") => void;
 }
+
+/** How far the mouse must travel before a press on # becomes a drag (a plain click just selects). */
+const DRAG_THRESHOLD = 4;
 
 function Cell({
   children,
@@ -55,6 +60,7 @@ function Cell({
   align = "left",
   className = "",
   wrap = false,
+  fill = false,
 }: {
   children: React.ReactNode;
   width: number;
@@ -62,11 +68,13 @@ function Cell({
   className?: string;
   /** Let the content wrap (and the row grow) instead of cutting it off. */
   wrap?: boolean;
+  /** Content fills the whole cell edge to edge, at any row height (no padding). */
+  fill?: boolean;
 }) {
   return (
     <div
       style={{ width, textAlign: align }}
-      className={`shrink-0 border-r border-slate-200 px-2 ${wrap ? "self-stretch flex items-center" : "truncate"} ${className}`}
+      className={`shrink-0 border-r border-slate-200 ${fill ? "flex self-stretch" : wrap ? "flex items-center self-stretch px-2" : "truncate px-2"} ${className}`}
     >
       {children}
     </div>
@@ -218,7 +226,7 @@ function StatusCell({
   if (readOnly || task.isSummary) {
     return (
       <span
-        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
+        className="flex h-full w-full items-center justify-center gap-1 px-1 text-[11px] font-medium"
         style={{ background: token.tint, color: token.colour }}
       >
         <span aria-hidden>{token.icon}</span>
@@ -231,8 +239,8 @@ function StatusCell({
       value={task.effectiveStatus}
       onChange={(e) => onChange(e.target.value as TaskStatus)}
       onMouseDown={(e) => e.stopPropagation()}
-      className="w-full cursor-pointer rounded border-0 bg-transparent px-1 py-0.5 text-[11px] font-medium outline-none focus:ring-2 focus:ring-blue-400"
-      style={{ background: token.tint, color: token.colour }}
+      className="h-full w-full cursor-pointer rounded-none border-0 px-1 text-[11px] font-medium outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset"
+      style={{ background: token.tint, color: token.colour, textAlignLast: "center" }}
       aria-label={`Status of ${task.name}`}
     >
       {STATUS_ORDER.map((s) => (
@@ -261,7 +269,10 @@ export default function TaskGrid({
   onSetOwner,
   onSetPredecessors,
   onRowHeights,
+  onMoveTask,
 }: Props) {
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [drop, setDrop] = useState<{ id: string; position: "before" | "after" } | null>(null);
   const widths = { ...COLS, ...columnWidths };
   const gridWidth = Object.values(widths).reduce((a, b) => a + b, 0);
 
@@ -282,6 +293,51 @@ export default function TaskGrid({
     rowEls.current.forEach((el) => ro.observe(el));
     return () => ro.disconnect();
   }, [reportHeights]);
+
+  /** Press and hold on a row's # number, move over another row, release to drop it there. */
+  const beginRowDrag = (taskId: string) => (e: React.MouseEvent) => {
+    if (readOnly || !onMoveTask || e.button !== 0) return;
+    const startY = e.clientY;
+    let dragging = false;
+    let target: { id: string; position: "before" | "after" } | null = null;
+
+    const targetAt = (y: number) => {
+      for (const [id, el] of rowEls.current) {
+        const r = el.getBoundingClientRect();
+        if (y >= r.top && y < r.bottom) {
+          return id === taskId ? null : { id, position: y < r.top + r.height / 2 ? ("before" as const) : ("after" as const) };
+        }
+      }
+      return null;
+    };
+    const move = (ev: MouseEvent) => {
+      if (!dragging) {
+        if (Math.abs(ev.clientY - startY) < DRAG_THRESHOLD) return;
+        dragging = true;
+        setDragId(taskId);
+        document.body.style.cursor = "grabbing";
+      }
+      ev.preventDefault();
+      target = targetAt(ev.clientY);
+      setDrop(target);
+    };
+    const finish = (commit: boolean) => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      window.removeEventListener("keydown", key);
+      document.body.style.cursor = "";
+      setDragId(null);
+      setDrop(null);
+      if (commit && dragging && target) onMoveTask(taskId, target.id, target.position);
+    };
+    const up = () => finish(true);
+    const key = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") finish(false);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    window.addEventListener("keydown", key);
+  };
 
   const beginResize = (col: ResizableCol) => (e: React.MouseEvent) => {
     e.preventDefault();
@@ -338,22 +394,40 @@ export default function TaskGrid({
               if (el) rowEls.current.set(t.id, el);
               else rowEls.current.delete(t.id);
             }}
-            style={{ minHeight: ROW_HEIGHT }}
+            style={{ minHeight: ROW_HEIGHT, boxShadow: isSelected ? "inset 2px 0 0 #2563eb" : undefined }}
             onMouseDown={(e) => onSelect(t.id, e.shiftKey || e.metaKey || e.ctrlKey)}
-            className={`flex items-center border-b border-slate-100 ${t.level > 0 ? "text-[12.33px]" : "text-[13px]"} transition-colors ${
-              isSelected
-                ? "bg-blue-50 shadow-[inset_2px_0_0_#2563eb]"
-                : t.isSummary
-                  ? "bg-slate-50"
-                  : "bg-white hover:bg-slate-50"
-            }`}
+            className={`group relative flex items-center border-b border-slate-100 ${t.level > 0 ? "text-[12.33px]" : "text-[13px]"} transition-colors ${
+              dragId === t.id ? "opacity-40" : ""
+            } ${isSelected ? "bg-blue-50" : t.isSummary ? "bg-slate-50" : "bg-white hover:bg-slate-50"}`}
           >
+            {/* While dragging: a blue line where the task will land, drawn above the cells. */}
+            {drop?.id === t.id && (
+              <div
+                data-drop-line={drop.position}
+                className={`pointer-events-none absolute right-0 left-0 z-10 h-[3px] bg-blue-600 ${
+                  drop.position === "before" ? "-top-px" : "-bottom-px"
+                }`}
+              />
+            )}
             <Cell
               width={widths.wbs}
               align="center"
-              className={t.level > 0 ? "text-[11px] text-slate-500" : "text-[11px] font-semibold text-slate-700"}
+              className={`${t.level > 0 ? "text-[11px] text-slate-500" : "text-[11px] font-semibold text-slate-700"} ${
+                readOnly || !onMoveTask ? "" : "cursor-grab select-none"
+              }`}
             >
-              {t.wbs}
+              <span
+                onMouseDown={beginRowDrag(t.id)}
+                title={readOnly || !onMoveTask ? undefined : "Drag to move this task"}
+                className="relative inline-flex w-full items-center justify-center"
+              >
+                {!readOnly && onMoveTask && (
+                  <span aria-hidden className="absolute left-0 text-slate-300 opacity-0 transition group-hover:opacity-100">
+                    ⋮⋮
+                  </span>
+                )}
+                {t.wbs}
+              </span>
             </Cell>
             <Cell
               width={widths.name}
@@ -417,7 +491,7 @@ export default function TaskGrid({
                 className="text-center"
               />
             </Cell>
-            <Cell width={widths.status} align="center">
+            <Cell width={widths.status} align="center" fill>
               <StatusCell task={t} readOnly={readOnly} onChange={(s) => onPatch(t.id, { status: s })} />
             </Cell>
             <Cell width={widths.preds} align="center" className="text-[11px] text-slate-500">

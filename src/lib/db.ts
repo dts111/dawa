@@ -10,7 +10,7 @@
 import { createClient, type Client, type InArgs, type InStatement } from "@libsql/client";
 import fs from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import type {
   Assignment,
   AutomationRule,
@@ -89,12 +89,60 @@ async function transaction(statements: { sql: string; args: unknown[] }[]): Prom
   );
 }
 
+/** Bump whenever runMigrations() changes, so existing databases pick the change up. */
+const SCHEMA_VERSION = "2026-10-08.1";
+
+/**
+ * Start-up checks. On an up-to-date database this is one PRAGMA and one read:
+ * the full migration and the admin sync only run when something changed. (Each
+ * query to a hosted database is a network round trip, so this matters for the
+ * first request after the server has been idle.)
+ */
 async function migrate(d: Client, isFile: boolean) {
-  if (isFile) {
-    await d.execute("PRAGMA journal_mode = WAL");
-  }
+  if (isFile) await d.execute("PRAGMA journal_mode = WAL");
   await d.execute("PRAGMA foreign_keys = ON");
+
+  let meta = new Map<string, string>();
+  try {
+    const rs = await d.execute("SELECT key, value FROM meta WHERE key IN ('schemaVersion', 'adminFingerprint')");
+    meta = new Map(rs.rows.map((r) => [String(r.key), String(r.value)]));
+  } catch {
+    // No meta table yet: a database from before this check existed.
+  }
+
+  if (meta.get("schemaVersion") !== SCHEMA_VERSION) {
+    await runMigrations(d);
+    await setMeta(d, "schemaVersion", SCHEMA_VERSION);
+  }
+  const fingerprint = adminFingerprint();
+  if (meta.get("adminFingerprint") !== fingerprint) {
+    await ensureAdmin(d);
+    await setMeta(d, "adminFingerprint", fingerprint);
+  }
+}
+
+async function setMeta(d: Client, key: string, value: string) {
+  await d.execute({
+    sql: "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    args: [key, value],
+  });
+}
+
+/** Changes whenever ADMIN_EMAIL or ADMIN_PASSWORD changes, without storing either. */
+function adminFingerprint(): string {
+  return createHmac("sha256", process.env.SESSION_SECRET ?? "")
+    .update(`${(process.env.ADMIN_EMAIL ?? "").trim().toLowerCase()}\n${process.env.ADMIN_PASSWORD ?? ""}`)
+    .digest("base64url");
+}
+
+/** Creates tables and adds columns. Safe to re-run; only called when SCHEMA_VERSION changes. */
+async function runMigrations(d: Client) {
   await d.executeMultiple(`
+    CREATE TABLE IF NOT EXISTS meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -251,8 +299,6 @@ async function migrate(d: Client, isFile: boolean) {
   // Accounts: every plan belongs to one user.
   await addColumnIfMissing(d, "projects", "ownerId", "TEXT");
   await d.execute("CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(ownerId)");
-
-  await ensureAdmin(d);
 }
 
 /**
@@ -385,6 +431,46 @@ export async function listProjects(ownerId: string): Promise<Project[]> {
   return (await all<ProjectRow>("SELECT * FROM projects WHERE ownerId = ? ORDER BY createdAt DESC", ownerId)).map(
     mapProject,
   );
+}
+
+/**
+ * Everything a plan needs, read in ONE round trip to the database (a batch), using
+ * the same queries as getProject / listTasks / listDependencies / listResources /
+ * listAssignments / listShareLinks / listAutomations.
+ */
+export async function loadProjectRows(projectId: string) {
+  const results = await (await db()).batch(
+    [
+      { sql: "SELECT * FROM projects WHERE id = ?", args: [projectId] },
+      { sql: "SELECT * FROM tasks WHERE projectId = ? ORDER BY sortOrder, createdAt", args: [projectId] },
+      { sql: "SELECT * FROM dependencies WHERE projectId = ?", args: [projectId] },
+      { sql: "SELECT * FROM resources WHERE projectId = ? ORDER BY name", args: [projectId] },
+      {
+        sql: "SELECT a.* FROM assignments a JOIN tasks t ON t.id = a.taskId WHERE t.projectId = ?",
+        args: [projectId],
+      },
+      {
+        sql: "SELECT * FROM share_links WHERE projectId = ? AND revokedAt IS NULL ORDER BY createdAt DESC",
+        args: [projectId],
+      },
+      { sql: "SELECT * FROM automation_rules WHERE projectId = ? ORDER BY createdAt", args: [projectId] },
+    ],
+    "read",
+  );
+  const rows = <T,>(i: number) =>
+    results[i].rows.map((row) => Object.fromEntries(results[i].columns.map((c, j) => [c, row[j]])) as T);
+
+  const project = rows<ProjectRow>(0)[0];
+  if (!project) return null;
+  return {
+    project: mapProject(project),
+    tasks: rows<Task>(1),
+    dependencies: rows<Dependency>(2),
+    resources: rows<Resource>(3),
+    assignments: rows<Assignment>(4),
+    shareLinks: rows<ShareLink>(5),
+    automations: rows<AutomationRule>(6),
+  };
 }
 
 export async function getProject(id: string): Promise<Project | null> {
@@ -582,6 +668,60 @@ export async function recordLoginFailure(user: UserAuthRecord, maxAttempts = 10,
 }
 
 // --- Tasks -----------------------------------------------------------------
+
+export type MoveRequest =
+  | { direction: "up" | "down" }
+  | { targetId: string; position: "before" | "after" };
+
+/**
+ * Moves a task among its siblings (up/down), or next to another task — taking that
+ * task's parent (drag and drop). The affected sibling group is renumbered 10, 20, 30…
+ * in one transaction, so repeated quick moves can never leave duplicate positions.
+ */
+export async function moveTask(
+  taskId: string,
+  move: MoveRequest,
+): Promise<{ ok: true; projectId: string } | { ok: false; error: string }> {
+  const moving = await getTask(taskId);
+  if (!moving) return { ok: false, error: "Task not found." };
+  const tasks = await listTasks(moving.projectId);
+  const bySort = (a: Task, b: Task) => a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt);
+  const childrenOf = (parentId: string | null) =>
+    tasks.filter((t) => (t.parentId ?? null) === parentId && t.id !== taskId).sort(bySort);
+
+  let parentId = moving.parentId ?? null;
+  let order: Task[];
+
+  if ("direction" in move) {
+    const siblings = [...childrenOf(parentId), moving].sort(bySort);
+    const i = siblings.findIndex((t) => t.id === taskId);
+    const j = move.direction === "up" ? i - 1 : i + 1;
+    if (j < 0 || j >= siblings.length) return { ok: true, projectId: moving.projectId }; // already at the edge
+    [siblings[i], siblings[j]] = [siblings[j], siblings[i]];
+    order = siblings;
+  } else {
+    const target = tasks.find((t) => t.id === move.targetId);
+    if (!target) return { ok: false, error: "That task isn't in this plan." };
+    if (target.id === taskId) return { ok: true, projectId: moving.projectId };
+    // Dropping a task inside its own sub-tasks would cut that branch off the plan.
+    const byId = new Map(tasks.map((t) => [t.id, t]));
+    for (let cur: Task | undefined = target, guard = 0; cur && guard < 1000; guard++) {
+      if (cur.id === taskId) return { ok: false, error: "A task can't be moved inside its own sub-tasks." };
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+    }
+    parentId = target.parentId ?? null;
+    const siblings = childrenOf(parentId);
+    const at = siblings.findIndex((t) => t.id === target.id) + (move.position === "after" ? 1 : 0);
+    siblings.splice(at, 0, moving);
+    order = siblings;
+  }
+
+  await transaction([
+    { sql: "UPDATE tasks SET parentId = ? WHERE id = ?", args: [parentId, taskId] },
+    ...order.map((t, i) => ({ sql: "UPDATE tasks SET sortOrder = ? WHERE id = ?", args: [(i + 1) * 10, t.id] })),
+  ]);
+  return { ok: true, projectId: moving.projectId };
+}
 
 export async function listTasks(projectId: string): Promise<Task[]> {
   return all<Task>("SELECT * FROM tasks WHERE projectId = ? ORDER BY sortOrder, createdAt", projectId);
