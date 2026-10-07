@@ -57,8 +57,9 @@ personal invites for clients, investors and partners.
 Share pages are marked `noindex`, and viewers never see the share panel or the
 automation rules.
 
-> With Resend's test sender (`onboarding@resend.dev`) emails are only delivered
-> to your own address. Verify your domain in Resend to email stakeholders.
+> To email anyone, send through a Gmail account (see "Deploying for free", step 2)
+> or verify your domain in Resend. Resend's test sender (`onboarding@resend.dev`)
+> only delivers to your own address.
 
 ---
 
@@ -180,11 +181,24 @@ turso db tokens create eaas-pm                         # → DATABASE_AUTH_TOKEN
 (Start from an empty database instead with `turso db create eaas-pm` — tables are
 created on first request.)
 
-### 2. Email — Resend (free)
+### 2. Email — a Gmail account (simplest) or Resend
 
-Create an API key at <https://resend.com> → `RESEND_API_KEY`. Verify your domain
-there so invites and updates can go to anyone, and set `EMAIL_FROM` to an address
-on it.
+**Gmail (no domain needed).** The app can send through a Gmail account, to any
+address (Gmail, Hotmail, company email):
+
+1. Sign in to the Gmail account → Google Account → **Security** → turn on
+   **2-Step Verification** (required for the next step).
+2. Open <https://myaccount.google.com/apppasswords>, create one called
+   "Dafegen PM" and copy the 16-letter password.
+3. Set `SMTP_USER` = the Gmail address, `SMTP_PASS` = that App password
+   (mark it secret in your host), and optionally
+   `EMAIL_FROM="Your Name <the-gmail-address>"`.
+
+Gmail allows roughly 500 recipients a day. Replies go to the Gmail inbox.
+
+**Resend.** Create an API key at <https://resend.com> → `RESEND_API_KEY`. Verify
+your domain there so invites and updates can go to anyone, and set `EMAIL_FROM`
+to an address on it. If both are set, Gmail/SMTP is used.
 
 ### 3a. Host on Netlify (free)
 
@@ -215,7 +229,9 @@ after that takes up to a minute to wake. Netlify has no sleep.
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | your sign-in |
 | `SESSION_SECRET` | any long random string |
 | `AUTOMATION_SECRET` | any long random string (also add it to GitHub secrets) |
-| `RESEND_API_KEY`, `EMAIL_FROM` | from step 2 |
+| `SMTP_USER`, `SMTP_PASS` | Gmail address + App password (step 2); `SMTP_HOST`/`SMTP_PORT` default to Gmail |
+| `RESEND_API_KEY` | alternative to Gmail (step 2) |
+| `EMAIL_FROM` | the "from" name and address |
 
 ### Other hosts
 

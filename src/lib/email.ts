@@ -1,7 +1,11 @@
-// Outbound email. Uses Resend when RESEND_API_KEY is present; otherwise it
-// falls back to "preview mode", which returns the rendered HTML instead of
-// sending, so the feature is usable before any account is set up.
+// Outbound email, through whichever provider is configured:
+//   1. SMTP (SMTP_USER + SMTP_PASS) — e.g. a Gmail account with an App password,
+//      which can email any address with no domain set-up;
+//   2. Resend (RESEND_API_KEY);
+//   3. neither — "preview mode", which returns the rendered HTML instead of
+//      sending, so the feature is usable before any account is set up.
 
+import nodemailer from "nodemailer";
 import { Resend } from "resend";
 import { createUpdateToken } from "./db";
 import { formatDate } from "./calendar";
@@ -12,8 +16,28 @@ export function appUrl(): string {
   return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 }
 
+function isSmtpConfigured(): boolean {
+  return Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
+}
+
 export function isEmailConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY);
+  return isSmtpConfigured() || Boolean(process.env.RESEND_API_KEY);
+}
+
+let smtp: ReturnType<typeof nodemailer.createTransport> | null = null;
+
+/** One connection setup per server instance; Gmail by default. */
+function smtpTransport() {
+  if (!smtp) {
+    const port = Number(process.env.SMTP_PORT || 465);
+    smtp = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port,
+      secure: port === 465,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+  }
+  return smtp;
 }
 
 const BRAND = "#1f3864";
@@ -254,7 +278,16 @@ export interface SendResult {
 
 export async function sendEmail(to: string, subject: string, html: string): Promise<SendResult> {
   if (!isEmailConfigured()) {
-    return { to, sent: false, error: "Preview only — RESEND_API_KEY is not set.", previewHtml: html };
+    return { to, sent: false, error: "Preview only — email sending is not set up.", previewHtml: html };
+  }
+  if (isSmtpConfigured()) {
+    try {
+      const from = process.env.EMAIL_FROM || process.env.SMTP_USER!;
+      await smtpTransport().sendMail({ from, to, subject, html });
+      return { to, sent: true };
+    } catch (e) {
+      return { to, sent: false, error: e instanceof Error ? e.message : "Unknown send failure" };
+    }
   }
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);

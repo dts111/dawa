@@ -39,6 +39,13 @@ interface Props {
 const input =
   "w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 outline-none transition focus:border-brand focus:ring-3 focus:ring-brand/15";
 
+/** When some emails didn't go out, the first reason (e.g. a rejected Gmail App password). */
+function sendProblem(r: { sent?: number; attempted?: number; results?: { sent: boolean; error?: string }[] }) {
+  if (!r.attempted || r.sent === r.attempted) return "";
+  const reason = r.results?.find((x) => !x.sent && x.error)?.error;
+  return reason ? ` Not sent: ${reason}` : "";
+}
+
 export default function SidePanel({
   panel,
   bundle,
@@ -273,8 +280,8 @@ export default function SidePanel({
                   if (r)
                     onNotice(
                       r.configured
-                        ? `Task update emails sent to ${r.sent} of ${r.attempted} recipient(s).`
-                        : "Email is in preview mode — add RESEND_API_KEY to .env.local to send for real.",
+                        ? `Task update emails sent to ${r.sent} of ${r.attempted} recipient(s).${sendProblem(r)}`
+                        : "Email is in preview mode — set up email sending (a Gmail account or Resend) to send for real.",
                     );
                 }}
                 className="rounded-lg bg-brand px-2.5 py-1.5 font-medium text-white shadow-sm transition hover:bg-brand-hover"
@@ -288,8 +295,8 @@ export default function SidePanel({
                   if (r)
                     onNotice(
                       r.configured
-                        ? `Status digest sent to ${r.sent} of ${r.attempted} recipient(s).`
-                        : "Email is in preview mode — add RESEND_API_KEY to .env.local to send for real.",
+                        ? `Status digest sent to ${r.sent} of ${r.attempted} recipient(s).${sendProblem(r)}`
+                        : "Email is in preview mode — set up email sending (a Gmail account or Resend) to send for real.",
                     );
                 }}
                 className="rounded-lg bg-brand px-2.5 py-1.5 font-medium text-white shadow-sm transition hover:bg-brand-hover"
@@ -346,7 +353,7 @@ function SharePanel({
         ? `View-only invite emailed to ${count === 1 ? "1 person" : `${count} people`}.`
         : sent > 0
           ? `Invites emailed to ${sent} of ${count}. Check the email settings for the rest.`
-          : "Access created, but email is in preview mode — add RESEND_API_KEY to send invites. Meanwhile you can copy each person's link below.",
+          : "Access created, but email isn't set up yet (Gmail or Resend), so no invites went out. Meanwhile you can copy each person's link below.",
     );
   };
 
@@ -602,7 +609,7 @@ function AutomationsPanel({
             const res = await fetch("/api/automations/run", { method: "POST" });
             const json = await res.json();
             onNotice(
-              `Ran ${json.rules ?? 0} rule(s) — ${json.totalSent ?? 0} email(s) sent. Emails only actually leave if RESEND_API_KEY is set.`,
+              `Ran ${json.rules ?? 0} rule(s) — ${json.totalSent ?? 0} email(s) sent. Emails only actually leave once email sending (Gmail or Resend) is set up.`,
             );
           }}
           className="rounded-lg bg-brand px-2.5 py-1.5 font-medium text-white shadow-sm transition hover:bg-brand-hover"
